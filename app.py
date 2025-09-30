@@ -3,17 +3,14 @@ import pandas as pd
 import io
 import openpyxl 
 import datetime
-# Import library untuk Word, termasuk RGBColor
+# Import library untuk Word
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.section import WD_SECTION
 
 # =============================================================================
 # FUNGSI 1: TRANSFORMASI REKAP PEMOTONGAN
 # =============================================================================
 def transform_rekap_pemotongan(uploaded_file):
-    # ... (Kode fungsi ini tidak berubah, dibiarkan sama seperti sebelumnya)
     try:
         if uploaded_file.name.endswith('.xlsx'):
             df = pd.read_excel(uploaded_file, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl')
@@ -81,7 +78,6 @@ def transform_rekap_pemotongan(uploaded_file):
 # FUNGSI 2: TRANSFORMASI REKAP KEBUTUHAN MINGGUAN
 # =============================================================================
 def transform_rekap_kebutuhan(file_sales):
-    # ... (Kode fungsi ini tidak berubah, dibiarkan sama seperti sebelumnya)
     try:
         df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1)
         
@@ -125,7 +121,7 @@ def transform_rekap_kebutuhan(file_sales):
 37,1PKT-00021,Paket Aqiqah Domba Tipe D - Jantan (Spesial),Paket Aqiqah Domba Tipe D - Jantan
 38,1PKT-00039,Paket Aqiqah Domba Tipe D - Jantan (Tanpa Masak),Paket Aqiqah Domba Tipe D - Jantan
 39,1PKT-00031,Paket Aqiqah Domba Tipe D - Jantan (Tanpa Nasi Box),Paket Aqiqah Domba Tipe D - Jantan
-        """
+"""
         df_kategori = pd.read_csv(io.StringIO(kategori_csv_data))
 
     except Exception as e:
@@ -147,7 +143,8 @@ def transform_rekap_kebutuhan(file_sales):
     df_sales = df_sales.drop(columns=["No. Invoice", "Satuan"])
     df_grouped = df_sales.groupby(["Tanggal Potong", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
     
-    df_grouped['Tanggal Potong'] = pd.to_datetime(df_grouped['Tanggal Potong']).dt.strftime('%Y-%m-%d')
+    df_grouped['Tanggal Potong'] = pd.to_datetime(df_grouped['Tanggal Potong']).dt.strftime('%d-%m-%Y')
+    
     df_pivot = df_grouped.pivot_table(index='Paket & Menu', columns='Tanggal Potong', values='Jumlah', aggfunc='sum').fillna(0)
     
     df_pivot.reset_index(inplace=True)
@@ -173,17 +170,14 @@ def transform_rekap_kebutuhan(file_sales):
     return df_final
 
 # =============================================================================
-# FUNGSI 3: TRANSFORMASI DAN PEMBUATAN DOKUMEN WORD LABEL MASAK
+# FUNGSI 3: TRANSFORMASI LABEL MASAK
 # =============================================================================
 def transform_and_create_word_label(file_input):
-    """
-    Membaca file Excel, mentransformasikannya, dan menghasilkan file Word.
-    """
     try:
         df = pd.read_excel(file_input, sheet_name="Status Pesanan Penjualan", header=1)
         df.dropna(subset=['No. Invoice'], inplace=True)
         df = df[df['Cabang'] != 'Cabang'].copy()
-
+        
         for col in ['Tanggal Kirim', 'Tanggal Potong']:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y')
         
@@ -196,7 +190,6 @@ def transform_and_create_word_label(file_input):
 
         df['Jam Tiba (hh:mm)'] = df['Jam Tiba (hh:mm)'].apply(format_time)
         df['Jam Kirim (hh:mm)'] = df['Jam Kirim (hh:mm)'].apply(format_time)
-
         df.fillna('', inplace=True)
         
         df['Detail Customer'] = (
@@ -206,19 +199,17 @@ def transform_and_create_word_label(file_input):
             "Cabang: " + df['Cabang'].astype(str).str.strip()
         )
         df['Detail Waktu'] = (
-            "Tanggal Kirim: " + df['Tanggal Kirim'].astype(str).str.strip() + "\n" +
-            "Tanggal Potong: " + df['Tanggal Potong'].astype(str).str.strip() + "\n" +
+            "Tgl Kirim: " + df['Tanggal Kirim'].astype(str).str.strip() + "\n" +
+            "Tgl Potong: " + df['Tanggal Potong'].astype(str).str.strip() + "\n" +
             "Jam Tiba: " + df['Jam Tiba (hh:mm)'].astype(str).str.strip() + "\n" +
             "Jam Kirim: " + df['Jam Kirim (hh:mm)'].astype(str).str.strip()
         )
         df['Menu'] = df['Paket & Menu'].astype(str) + " " + df['Jumlah'].astype(str) + " " + df['Satuan'].astype(str)
         df['Berat'] = "Berat |\n....... KG"
-
         df_final = df[['Detail Customer', 'Detail Waktu', 'Menu', 'Berat']].copy()
         
         doc = Document()
-        sections = doc.sections
-        for section in sections:
+        for section in doc.sections:
             section.top_margin = Cm(0.88)
             section.bottom_margin = Cm(1.75)
             section.left_margin = Cm(2.12)
@@ -226,61 +217,48 @@ def transform_and_create_word_label(file_input):
 
         for i in range(0, len(df_final), 5):
             chunk = df_final.iloc[i:i+5]
-            
-            # <<< PERBAIKAN: Menambahkan baris header di setiap tabel >>>
-            table = doc.add_table(rows=1, cols=4) # Mulai dengan 1 baris untuk header
+            table = doc.add_table(rows=0, cols=4)
             table.style = 'Table Grid'
             
-            # Isi header
-            hdr_cells = table.rows[0].cells
-            hdr_cells[0].text = 'Detail Customer'
-            hdr_cells[1].text = 'Detail Waktu'
-            hdr_cells[2].text = 'Menu'
-            hdr_cells[3].text = 'Berat'
-
-            # Tambahkan baris data
-            for df_index, record in chunk.iterrows():
+            for _, record in chunk.iterrows():
                 row_cells = table.add_row().cells
                 row_cells[0].text = str(record['Detail Customer'])
                 row_cells[1].text = str(record['Detail Waktu'])
                 row_cells[2].text = str(record['Menu'])
                 row_cells[3].text = str(record['Berat'])
-
-            # Atur format untuk seluruh tabel (termasuk header dan data)
+            
             for row in table.rows:
                 row.height = Cm(4.5)
                 for cell in row.cells:
                     text_to_check = cell.text
                     for paragraph in cell.paragraphs:
+                        paragraph.paragraph_format.line_spacing = 1.3
                         for run in paragraph.runs:
                             run.font.name = 'Arial'
                             run.font.size = Pt(10)
-                            
                             if "Cibubur" in text_to_check:
                                 run.font.bold = True
-                                run.font.color.rgb = RGBColor(0, 0, 255) # Biru
+                                run.font.color.rgb = RGBColor(0, 0, 255)
                             elif "JaDeTa" in text_to_check:
                                 run.font.bold = True
-                                run.font.color.rgb = RGBColor(255, 0, 0) # Merah
-
-            # Atur lebar kolom
+                                run.font.color.rgb = RGBColor(255, 0, 0)
+            
             table.columns[0].width = Cm(5.64)
             table.columns[1].width = Cm(2.75)
             table.columns[2].width = Cm(5.29)
             table.columns[3].width = Cm(1.76)
-
+            
             if i + 5 < len(df_final):
                 doc.add_page_break()
-
+        
         doc_io = io.BytesIO()
         doc.save(doc_io)
         doc_io.seek(0)
-        
         return doc_io
-
     except Exception as e:
-        st.error(f"Terjadi kesalahan: {e}")
-        st.warning("Pastikan file yang diunggah adalah template yang benar dan berisi sheet 'Status Pesanan Penjualan'.")
+        st.error(f"Terjadi kesalahan pada pembuatan Label Masak: {e}")
+        import traceback
+        st.text(traceback.format_exc())
         return None
 
 # =============================================================================
@@ -341,7 +319,14 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
             st.dataframe(result_df_kebutuhan)
             output_kebutuhan = io.BytesIO()
             with pd.ExcelWriter(output_kebutuhan, engine='xlsxwriter') as writer:
-                result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Hasil Rekap Kebutuhan')
+                result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Rekap Kebutuhan', startrow=1, header=False)
+                workbook = writer.book
+                worksheet = writer.sheets['Rekap Kebutuhan']
+                header_format = workbook.add_format({'bold': True, 'text_wrap': True, 'valign': 'top', 'fg_color': '#D7E4BC', 'border': 1})
+                for col_num, value in enumerate(result_df_kebutuhan.columns.values):
+                    worksheet.write(0, col_num, value, header_format)
+                worksheet.set_column(0, 0, 40)
+                worksheet.set_column(1, len(result_df_kebutuhan.columns)-1, 15)
             excel_data_kebutuhan = output_kebutuhan.getvalue()
             now = datetime.datetime.now()
             download_filename_kebutuhan = now.strftime("%d_%m_%Y-%H_%M") + "-Rekap_Kebutuhan_Mingguan.xlsx"
@@ -351,24 +336,14 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
 elif menu_pilihan == "Label Masak":
     st.title("🏷️ Aplikasi Transformasi - Label Masak")
     st.write("Unggah file template Excel untuk membuat label masak dalam format Microsoft Word.")
-
-    uploaded_file_label = st.file_uploader(
-        "Pilih File Template Excel",
-        type=['xlsx'],
-        key="label_masak"
-    )
-
+    uploaded_file_label = st.file_uploader("Pilih File Template Excel", type=['xlsx'], key="label_masak")
     if uploaded_file_label is not None:
         st.info(f"✔️ File '{uploaded_file_label.name}' diterima. Memproses...")
-        
         word_file_buffer = transform_and_create_word_label(uploaded_file_label)
-        
         if word_file_buffer:
             st.success("🎉 Dokumen Word berhasil dibuat!")
-            
             now = datetime.datetime.now()
             download_filename_word = now.strftime("%d_%m_%Y-%H_%M") + "-Label_Masak.docx"
-
             st.download_button(
                 label="⬇️ Download Label Masak sebagai Word",
                 data=word_file_buffer,
