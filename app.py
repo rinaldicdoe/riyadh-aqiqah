@@ -319,7 +319,7 @@ menu_pilihan = st.sidebar.radio(
 
 # --- TAMPILAN MENU 1: REKAP PEMOTONGAN ---
 if menu_pilihan == "Rekap Pemotongan":
-    st.title("🚀 Aplikasi Transformasi - Rekap Pemotongan")
+    st.title("📝 Rekap Pemotongan")
     st.write("Unggah file Excel mentah untuk diproses.")
     uploaded_file_rekap = st.file_uploader("Pilih file Excel atau CSV", type=['xlsx', 'csv'], key="rekap_pemotongan")
     if uploaded_file_rekap:
@@ -355,7 +355,7 @@ if menu_pilihan == "Rekap Pemotongan":
 
 # --- TAMPILAN MENU 2: REKAP KEBUTUHAN MINGGUAN ---
 elif menu_pilihan == "Rekap Kebutuhan Mingguan":
-    st.title("📊 Aplikasi Transformasi - Rekap Kebutuhan Mingguan")
+    st.title("📊 Rekap Kebutuhan Mingguan")
     st.write("Unggah **File Status Penjualan** untuk diproses.")
     
     # ===== KATEGORI MANAGEMENT (EXPANDER) =====
@@ -509,7 +509,7 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
 
 # --- TAMPILAN MENU 3: LABEL MASAK ---
 elif menu_pilihan == "Label Masak":
-    st.title("🏷️ Aplikasi Transformasi - Label Masak")
+    st.title("🏷️ Label Masak")
     st.write("Unggah file template Excel untuk membuat label masak dalam format Microsoft Word.")
     uploaded_file_label = st.file_uploader("Pilih File Template Excel", type=['xlsx'], key="label_masak")
     if uploaded_file_label is not None:
