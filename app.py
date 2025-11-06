@@ -79,76 +79,107 @@ def transform_rekap_pemotongan(uploaded_file):
 # =============================================================================
 def transform_rekap_kebutuhan(file_sales):
     try:
-        df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1)
-        
-        kategori_csv_data = """No,Kode Barang,Nama Barang,Kelompok 
-1,1PKT-00012,Paket Aqiqah Domba Kebuli - Betina,Paket Aqiqah Domba Kebuli - Betina
-2,1PKT-00022,Paket Aqiqah Domba Kebuli - Betina (Nasi Biasa),Paket Aqiqah Domba Kebuli - Betina
-3,1PKT-00013,Paket Aqiqah Domba Kebuli - Jantan,Paket Aqiqah Domba Kebuli - Jantan
-4,1PKT-00023,Paket Aqiqah Domba Kebuli - Jantan (Nasi Biasa),Paket Aqiqah Domba Kebuli - Jantan
-5,1PKT-00001,Paket Aqiqah Domba Tipe A - Betina,Paket Aqiqah Domba Tipe A - Betina
-6,1PKT-00052,Paket Aqiqah Domba Tipe A - Betina (Bento Spesial),Paket Aqiqah Domba Tipe A - Betina
-7,1PKT-00062,Paket Aqiqah Domba Tipe A - Betina (Hemat),Paket Aqiqah Domba Tipe A - Betina
-8,1PKT-00014,Paket Aqiqah Domba Tipe A - Betina (Spesial),Paket Aqiqah Domba Tipe A - Betina
-9,1PKT-00032,Paket Aqiqah Domba Tipe A - Betina (Tanpa Masak),Paket Aqiqah Domba Tipe A - Betina
-10,1PKT-00024,Paket Aqiqah Domba Tipe A - Betina (Tanpa Nasi Box),Paket Aqiqah Domba Tipe A - Betina
-11,1PKT-00005,Paket Aqiqah Domba Tipe A - Jantan,Paket Aqiqah Domba Tipe A - Jantan
-12,1PKT-00049,Paket Aqiqah Domba Tipe A - Jantan (Plus),Paket Aqiqah Domba Tipe A - Jantan
-13,1PKT-00018,Paket Aqiqah Domba Tipe A - Jantan (Spesial),Paket Aqiqah Domba Tipe A - Jantan
-14,1PKT-00036,Paket Aqiqah Domba Tipe A - Jantan (Tanpa Masak),Paket Aqiqah Domba Tipe A - Jantan
-15,1PKT-00028,Paket Aqiqah Domba Tipe A - Jantan (Tanpa Nasi Box),Paket Aqiqah Domba Tipe A - Jantan
-16,1PKT-00002,Paket Aqiqah Domba Tipe B - Betina,Paket Aqiqah Domba Tipe B - Betina
-17,1PKT-00015,Paket Aqiqah Domba Tipe B - Betina (Spesial),Paket Aqiqah Domba Tipe B - Betina
-18,1PKT-00033,Paket Aqiqah Domba Tipe B - Betina (Tanpa Masak),Paket Aqiqah Domba Tipe B - Betina
-19,1PKT-00025,Paket Aqiqah Domba Tipe B - Betina (Tanpa Nasi Box),Paket Aqiqah Domba Tipe B - Betina
-20,1PKT-00006,Paket Aqiqah Domba Tipe B - Jantan,Paket Aqiqah Domba Tipe B - Jantan
-21,1PKT-00019,Paket Aqiqah Domba Tipe B - Jantan (Spesial),Paket Aqiqah Domba Tipe B - Jantan
-22,1PKT-00037,Paket Aqiqah Domba Tipe B - Jantan (Tanpa Masak),Paket Aqiqah Domba Tipe B - Jantan
-23,1PKT-00029,Paket Aqiqah Domba Tipe B - Jantan (Tanpa Nasi Box),Paket Aqiqah Domba Tipe B - Jantan
-24,1PKT-00003,Paket Aqiqah Domba Tipe C - Betina,Paket Aqiqah Domba Tipe C - Betina
-25,1PKT-00016,Paket Aqiqah Domba Tipe C - Betina (Spesial),Paket Aqiqah Domba Tipe C - Betina
-26,1PKT-00034,Paket Aqiqah Domba Tipe C - Betina (Tanpa Masak),Paket Aqiqah Domba Tipe C - Betina
-27,1PKT-00026,Paket Aqiqah Domba Tipe C - Betina (Tanpa Nasi Box),Paket Aqiqah Domba Tipe C - Betina
-28,1PKT-00007,Paket Aqiqah Domba Tipe C - Jantan,Paket Aqiqah Domba Tipe C - Jantan
-29,1PKT-00020,Paket Aqiqah Domba Tipe C - Jantan (Spesial),Paket Aqiqah Domba Tipe C - Jantan
-30,1PKT-00038,Paket Aqiqah Domba Tipe C - Jantan (Tanpa Masak),Paket Aqiqah Domba Tipe C - Jantan
-31,1PKT-00030,Paket Aqiqah Domba Tipe C - Jantan (Tanpa Nasi Box),Paket Aqiqah Domba Tipe C - Jantan
-32,1PKT-00004,Paket Aqiqah Domba Tipe D - Betina,Paket Aqiqah Domba Tipe D - Betina
-33,1PKT-00017,Paket Aqiqah Domba Tipe D - Betina (Spesial),Paket Aqiqah Domba Tipe D - Betina
-34,1PKT-00035,Paket Aqiqah Domba Tipe D - Betina (Tanpa Masak),Paket Aqiqah Domba Tipe D - Betina
-35,1PKT-00027,Paket Aqiqah Domba Tipe D - Betina (Tanpa Nasi Box),Paket Aqiqah Domba Tipe D - Betina
-36,1PKT-00008,Paket Aqiqah Domba Tipe D - Jantan,Paket Aqiqah Domba Tipe D - Jantan
-37,1PKT-00021,Paket Aqiqah Domba Tipe D - Jantan (Spesial),Paket Aqiqah Domba Tipe D - Jantan
-38,1PKT-00039,Paket Aqiqah Domba Tipe D - Jantan (Tanpa Masak),Paket Aqiqah Domba Tipe D - Jantan
-39,1PKT-00031,Paket Aqiqah Domba Tipe D - Jantan (Tanpa Nasi Box),Paket Aqiqah Domba Tipe D - Jantan
-"""
-        df_kategori = pd.read_csv(io.StringIO(kategori_csv_data))
-
+        df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl')
     except Exception as e:
         st.error(f"Gagal membaca file: {e}")
         st.warning("Pastikan nama sheet pada file sales adalah 'Status Pesanan Penjualan'.")
         return None
-    
-    df_kategori.dropna(subset=['Kode Barang'], inplace=True)
+
+    # kategori mapping data (semicolon-separated) — replaced with provided data
+    kategori_csv_data = """Nama Barang;Kelompok 
+Paket Aqiqah Domba Kebuli - Betina;Paket Aqiqah Domba Kebuli - Betina
+Paket Aqiqah Domba Kebuli - Betina (Nasi Biasa);Paket Aqiqah Domba Kebuli - Betina
+Paket Aqiqah Domba Kebuli - Jantan;Paket Aqiqah Domba Kebuli - Jantan
+Paket Aqiqah Domba Kebuli - Jantan (Nasi Biasa);Paket Aqiqah Domba Kebuli - Jantan
+Paket Aqiqah Domba Tipe A - Betina;Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A - Betina (Bento Spesial);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A - Betina (Hemat);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A - Betina (Spesial);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A (Hemat) - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina
+Paket Aqiqah Domba Tipe A (Hemat) - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Jantan;Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Jantan (Spesial);Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Jantan (Hemat);Paket Aqiqah Domba Tipe A - Jantan
+Paket Aqiqah Domba Tipe A - Betina (Plus);Paket Aqiqah Domba Tipe A - Betina (Plus)
+Paket Aqiqah Domba Tipe A (Plus) - Betina (Spesial);Paket Aqiqah Domba Tipe A - Betina (Plus)
+Paket Aqiqah Domba Tipe A (Plus) - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina (Plus)
+Paket Aqiqah Domba Tipe A - Jantan (Plus);Paket Aqiqah Domba Tipe A - Jantan (Plus)
+Paket Aqiqah Domba Tipe A (Plus) - Jantan (Spesial);Paket Aqiqah Domba Tipe A - Jantan (Plus)
+Paket Aqiqah Domba Tipe A (Plus) - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan (Plus)
+Paket Aqiqah Domba Tipe B - Betina;Paket Aqiqah Domba Tipe B - Betina
+Paket Aqiqah Domba Tipe B - Betina (Spesial);Paket Aqiqah Domba Tipe B - Betina
+Paket Aqiqah Domba Tipe B - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe B - Betina
+Paket Aqiqah Domba Tipe B - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe B - Betina
+Paket Aqiqah Domba Tipe B - Jantan;Paket Aqiqah Domba Tipe B - Jantan
+Paket Aqiqah Domba Tipe B - Jantan (Spesial);Paket Aqiqah Domba Tipe B - Jantan
+Paket Aqiqah Domba Tipe B - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe B - Jantan
+Paket Aqiqah Domba Tipe B - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe B - Jantan
+Paket Aqiqah Domba Tipe C - Betina;Paket Aqiqah Domba Tipe C - Betina
+Paket Aqiqah Domba Tipe C - Betina (Spesial);Paket Aqiqah Domba Tipe C - Betina
+Paket Aqiqah Domba Tipe C - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe C - Betina
+Paket Aqiqah Domba Tipe C - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe C - Betina
+Paket Aqiqah Domba Tipe C - Jantan;Paket Aqiqah Domba Tipe C - Jantan
+Paket Aqiqah Domba Tipe C - Jantan (Spesial);Paket Aqiqah Domba Tipe C - Jantan
+Paket Aqiqah Domba Tipe C - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe C - Jantan
+Paket Aqiqah Domba Tipe C - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe C - Jantan
+Paket Aqiqah Domba Tipe D - Betina;Paket Aqiqah Domba Tipe D - Betina
+Paket Aqiqah Domba Tipe D - Betina (Spesial);Paket Aqiqah Domba Tipe D - Betina
+Paket Aqiqah Domba Tipe D - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe D - Betina
+Paket Aqiqah Domba Tipe D - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe D - Betina
+Paket Aqiqah Domba Tipe D - Jantan;Paket Aqiqah Domba Tipe D - Jantan
+Paket Aqiqah Domba Tipe D - Jantan (Spesial);Paket Aqiqah Domba Tipe D - Jantan
+Paket Aqiqah Domba Tipe D - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe D - Jantan
+Paket Aqiqah Domba Tipe D - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe D - Jantan
+"""
+    df_kategori = pd.read_csv(io.StringIO(kategori_csv_data), sep=';')
+    df_kategori.dropna(subset=['Nama Barang'], inplace=True)
     if 'Kelompok ' in df_kategori.columns:
         df_kategori.rename(columns={'Kelompok ': 'Paket & Menu Kategori'}, inplace=True)
+    elif 'Kelompok' in df_kategori.columns:
+        df_kategori.rename(columns={'Kelompok': 'Paket & Menu Kategori'}, inplace=True)
 
-    df_sales['Tanggal Potong'] = pd.to_datetime(df_sales['Tanggal Potong'], errors='coerce')
-    df_sales.dropna(subset=['Tanggal Potong', 'No. Invoice'], inplace=True)
+    # Use Tanggal Kirim instead of Tanggal Potong for column headers
+    df_sales['Tanggal Kirim'] = pd.to_datetime(df_sales['Tanggal Kirim'], errors='coerce')
+    # Drop rows where Tanggal Kirim is blank/null
+    df_sales.dropna(subset=['Tanggal Kirim', 'No. Invoice'], inplace=True)
     df_sales = df_sales[df_sales['Cabang'] != 'Cabang'].copy()
-    cols_to_keep = ["Tanggal Potong", "No. Invoice", "Paket & Menu", "Jumlah", "Satuan"]
+    cols_to_keep = ["Tanggal Kirim", "No. Invoice", "Paket & Menu", "Jumlah", "Satuan"]
     df_sales = df_sales[cols_to_keep]
-    df_sales = df_sales[df_sales['Satuan'] == 'EKOR'].copy()
-    df_sales['Paket & Menu'] = df_sales['Paket & Menu'].str.replace('Paket Aqiqah ', '', regex=False)
-    df_sales = df_sales.drop(columns=["No. Invoice", "Satuan"])
-    df_grouped = df_sales.groupby(["Tanggal Potong", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
     
-    df_grouped['Tanggal Potong'] = pd.to_datetime(df_grouped['Tanggal Potong']).dt.strftime('%d-%m-%Y')
+    # Split data into EKOR and non-EKOR
+    df_ekor = df_sales[df_sales['Satuan'] == 'EKOR'].copy()
+    df_non_ekor = df_sales[df_sales['Satuan'] != 'EKOR'].copy()
     
-    df_pivot = df_grouped.pivot_table(index='Paket & Menu', columns='Tanggal Potong', values='Jumlah', aggfunc='sum').fillna(0)
+    # Process EKOR data (Paket Aqiqah)
+    df_ekor['Paket & Menu'] = df_ekor['Paket & Menu'].str.replace('Paket Aqiqah ', '', regex=False)
+    df_ekor = df_ekor.drop(columns=["No. Invoice", "Satuan"])
+    df_grouped_ekor = df_ekor.groupby(["Tanggal Kirim", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
+    
+    # Process non-EKOR data (Menu items)
+    df_non_ekor = df_non_ekor.drop(columns=["No. Invoice", "Satuan"])
+    df_grouped_non_ekor = df_non_ekor.groupby(["Tanggal Kirim", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
+    
+    # Combine both datasets
+    df_grouped = pd.concat([df_grouped_ekor, df_grouped_non_ekor])
+    
+    # Format dates and create pivot table based on Tanggal Kirim
+    df_grouped['Tanggal Kirim'] = pd.to_datetime(df_grouped['Tanggal Kirim']).dt.strftime('%d-%m-%Y')
+    df_pivot = df_grouped.pivot_table(
+        index='Paket & Menu',
+        columns='Tanggal Kirim',
+        values='Jumlah',
+        aggfunc='sum'
+    ).fillna(0)
     
     df_pivot.reset_index(inplace=True)
-    df_pivot['Kelompok'] = 'Paket Aqiqah ' + df_pivot['Paket & Menu']
+    # Add 'Paket Aqiqah' prefix only to EKOR items
+    df_pivot['Kelompok'] = df_pivot['Paket & Menu'].apply(
+        lambda x: 'Paket Aqiqah ' + x if any(df_ekor['Paket & Menu'] == x) else x
+    )
     
     df_merged = pd.merge(df_pivot, df_kategori[['Nama Barang', 'Paket & Menu Kategori']], left_on='Kelompok', right_on='Nama Barang', how='left')
 
@@ -166,7 +197,45 @@ def transform_rekap_kebutuhan(file_sales):
     df_final.rename(columns={'Paket & Menu Final': 'Paket & Menu'}, inplace=True)
     
     df_final.dropna(subset=['Paket & Menu'], inplace=True)
-    
+
+    # --- Order date columns (based on Tanggal Kirim) oldest -> newest (left -> right)
+    # Identify candidate date columns (all columns except the item column)
+    item_col = 'Paket & Menu'
+    other_cols = [c for c in df_final.columns if c != item_col]
+
+    # Try parsing each candidate column as date (format dd-mm-YYYY)
+    parsed_dates = {}
+    for c in other_cols:
+        try:
+            parsed = pd.to_datetime(c, format='%d-%m-%Y', errors='coerce')
+        except Exception:
+            parsed = pd.NaT
+        parsed_dates[c] = parsed
+
+    # Keep only columns that parsed to a valid date, sort them ascending (oldest first)
+    date_cols = [c for c, p in parsed_dates.items() if pd.notna(p)]
+    date_cols_sorted = sorted(date_cols, key=lambda x: parsed_dates[x])
+
+    # Any remaining non-date columns (should be none, but keep safe)
+    remaining_cols = [c for c in other_cols if c not in date_cols_sorted]
+
+    # Final column order: item column, sorted date columns, then any remaining columns
+    final_col_order = [item_col] + date_cols_sorted + remaining_cols
+    # Reindex dataframe to that order (if some columns missing, reindex will keep existing)
+    existing_final_cols = [c for c in final_col_order if c in df_final.columns]
+    df_final = df_final.reindex(columns=existing_final_cols)
+
+    # --- Add TOTAL row at the bottom summing each date column (if any date columns exist)
+    if date_cols_sorted:
+        # Sum numeric values for date columns (ignore non-numeric safely)
+        totals = df_final[date_cols_sorted].sum(numeric_only=True)
+        totals_row = {col: totals.get(col, 0) for col in date_cols_sorted}
+        totals_row[item_col] = 'TOTAL'
+        # Fill any remaining non-date columns with empty string
+        for c in remaining_cols:
+            totals_row[c] = ''
+        df_final = pd.concat([df_final, pd.DataFrame([totals_row])], ignore_index=True)
+
     return df_final
 
 # =============================================================================
