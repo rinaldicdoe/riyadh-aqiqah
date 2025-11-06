@@ -132,6 +132,10 @@ def transform_rekap_kebutuhan(file_sales):
     # Load kategori from external file
     df_kategori = load_kategori()
     
+    if len(df_kategori) == 0:
+        st.error("❌ Kategori kosong! Silakan tambahkan kategori terlebih dahulu.")
+        return None
+    
     # Clean up data
     df_sales.dropna(subset=['Tanggal Kirim', 'No. Invoice'], inplace=True)
     df_sales = df_sales[df_sales['Cabang'] != 'Cabang'].copy()
@@ -165,7 +169,7 @@ def transform_rekap_kebutuhan(file_sales):
         lambda x: pd.to_datetime(x).strftime('%d-%m-%Y')
     )
     
-    # Create pivot table
+    # Create pivot table with ALL data first
     df_pivot = df_grouped.pivot_table(
         index='Paket & Menu',
         columns='Tanggal Kirim_str',
@@ -174,6 +178,17 @@ def transform_rekap_kebutuhan(file_sales):
     ).fillna(0).astype(int)
     
     df_pivot.reset_index(inplace=True)
+    
+    # Separate items that are in kategori vs not in kategori
+    kategori_items = df_kategori['Nama Barang'].values
+    df_in_kategori = df_pivot[df_pivot['Paket & Menu'].isin(kategori_items)].copy()
+    df_not_in_kategori = df_pivot[~df_pivot['Paket & Menu'].isin(kategori_items)].copy()
+    
+    # Store missing items for display
+    st.session_state.missing_items = df_not_in_kategori if len(df_not_in_kategori) > 0 else None
+    
+    # Use only items in kategori for main output
+    df_pivot = df_in_kategori.copy()
     
     # Sort date columns
     date_cols = [c for c in df_pivot.columns if c != 'Paket & Menu']
@@ -194,18 +209,6 @@ def transform_rekap_kebutuhan(file_sales):
     # Reorder columns
     final_col_order = ['Paket & Menu'] + date_cols_sorted_renamed
     df_final = df_pivot[final_col_order].copy()
-    
-    # Check if items are in kategori and store missing items
-    st.session_state.missing_items = None
-    if len(df_kategori) > 0:
-        missing_items_list = []
-        for item in df_final['Paket & Menu']:
-            if item not in df_kategori['Nama Barang'].values:
-                missing_items_list.append(item)
-        
-        if len(missing_items_list) > 0:
-            df_missing = df_final[df_final['Paket & Menu'].isin(missing_items_list)].copy()
-            st.session_state.missing_items = df_missing
     
     # Add TOTAL row at the bottom
     if len(date_cols_sorted_renamed) > 0:
@@ -471,26 +474,6 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
         if result_df_kebutuhan is not None:
             st.success("🎉 Transformasi data berhasil!")
             st.dataframe(result_df_kebutuhan)
-            
-            # --- Display items not in kategori ---
-            if 'missing_items' in st.session_state and st.session_state.missing_items is not None:
-                df_missing = st.session_state.missing_items
-                if len(df_missing) > 0:
-                    st.warning("⚠️ **Item yang tidak ada di Kategori:**")
-                    
-                    # Prepare display with total from last date column (R)
-                    display_cols = df_missing.columns.tolist()
-                    if len(display_cols) > 1:
-                        # Get last date column (R column)
-                        last_date_col = display_cols[-1]
-                        
-                        # Create summary df: Paket & Menu with total from last column
-                        df_display = df_missing[['Paket & Menu', last_date_col]].copy()
-                        df_display.rename(columns={last_date_col: 'Total (Kolom R)'}, inplace=True)
-                        df_display['Total (Kolom R)'] = df_display['Total (Kolom R)'].astype(int)
-                        df_display.rename(columns={'Paket & Menu': 'Nama Paket & Menu'}, inplace=True)
-                        
-                        st.dataframe(df_display, use_container_width=True)
             
             output_kebutuhan = io.BytesIO()
             with pd.ExcelWriter(output_kebutuhan, engine='xlsxwriter') as writer:
