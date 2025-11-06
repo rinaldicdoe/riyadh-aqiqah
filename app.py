@@ -57,7 +57,7 @@ def update_kategori(idx, nama_barang, kategori_final):
 def transform_rekap_pemotongan(uploaded_file):
     try:
         if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl')
+            df = pd.read_excel(uploaded_file, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl', engine_kwargs={'data_only': True})
         elif uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file, header=1)
         else:
@@ -123,7 +123,7 @@ def transform_rekap_pemotongan(uploaded_file):
 # =============================================================================
 def transform_rekap_kebutuhan(file_sales):
     try:
-        df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl')
+        df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl', engine_kwargs={'data_only': True})
     except Exception as e:
         st.error(f"Gagal membaca file: {e}")
         st.warning("Pastikan nama sheet pada file sales adalah 'Status Pesanan Penjualan'.")
@@ -223,11 +223,21 @@ def transform_rekap_kebutuhan(file_sales):
 # FUNGSI 3: TRANSFORMASI LABEL MASAK
 # =============================================================================
 def transform_and_create_word_label(file_input):
+    """
+    Membaca file Excel, mentransformasikannya, dan menghasilkan file Word.
+    """
     try:
-        df = pd.read_excel(file_input, sheet_name="Status Pesanan Penjualan", header=1)
+        # Try to read the specific sheet, if not found, read the first sheet
+        try:
+            df = pd.read_excel(file_input, sheet_name="Status Pesanan Penjualan", header=1)
+        except ValueError:
+            # Sheet not found, try reading the first sheet
+            st.info("⚠️ Sheet 'Status Pesanan Penjualan' tidak ditemukan. Membaca sheet pertama...")
+            df = pd.read_excel(file_input, sheet_name=0, header=1)
+        
         df.dropna(subset=['No. Invoice'], inplace=True)
         df = df[df['Cabang'] != 'Cabang'].copy()
-        
+
         for col in ['Tanggal Kirim', 'Tanggal Potong']:
             df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y')
         
@@ -240,6 +250,7 @@ def transform_and_create_word_label(file_input):
 
         df['Jam Tiba (hh:mm)'] = df['Jam Tiba (hh:mm)'].apply(format_time)
         df['Jam Kirim (hh:mm)'] = df['Jam Kirim (hh:mm)'].apply(format_time)
+
         df.fillna('', inplace=True)
         
         df['Detail Customer'] = (
@@ -254,12 +265,15 @@ def transform_and_create_word_label(file_input):
             "Jam Tiba: " + df['Jam Tiba (hh:mm)'].astype(str).str.strip() + "\n" +
             "Jam Kirim: " + df['Jam Kirim (hh:mm)'].astype(str).str.strip()
         )
-        df['Menu'] = df['Paket & Menu'].astype(str) + " " + df['Jumlah'].astype(str) + " " + df['Satuan'].astype(str)
+        # Format Menu: remove decimal points, keep only integers
+        df['Menu'] = df['Paket & Menu'].astype(str) + " " + df['Jumlah'].astype(str).str.replace(r'\.0$', '', regex=True) + " " + df['Satuan'].astype(str)
         df['Berat'] = "Berat |\n....... KG"
-        df_final = df[['Detail Customer', 'Detail Waktu', 'Menu', 'Berat']].copy()
+
+        df_final = df[['Detail Customer', 'Detail Waktu', 'Menu', 'Berat', 'Cabang']].copy()
         
         doc = Document()
-        for section in doc.sections:
+        sections = doc.sections
+        for section in sections:
             section.top_margin = Cm(0.88)
             section.bottom_margin = Cm(1.75)
             section.left_margin = Cm(2.12)
@@ -267,48 +281,125 @@ def transform_and_create_word_label(file_input):
 
         for i in range(0, len(df_final), 5):
             chunk = df_final.iloc[i:i+5]
+            
             table = doc.add_table(rows=0, cols=4)
             table.style = 'Table Grid'
-            
-            for _, record in chunk.iterrows():
+
+            # Tambahkan baris data (tanpa header)
+            for df_index, record in chunk.iterrows():
                 row_cells = table.add_row().cells
-                row_cells[0].text = str(record['Detail Customer'])
-                row_cells[1].text = str(record['Detail Waktu'])
-                row_cells[2].text = str(record['Menu'])
-                row_cells[3].text = str(record['Berat'])
-            
+                
+                # Kolom 1: Detail Customer dengan formatting khusus
+                cell_col1 = row_cells[0]
+                cell_col1.text = ''
+                detail_customer = str(record['Detail Customer'])
+                cabang = str(record['Cabang']).strip()
+                
+                for line in detail_customer.split('\n'):
+                    if cell_col1.text == '':
+                        p = cell_col1.paragraphs[0]
+                    else:
+                        p = cell_col1.add_paragraph()
+                    
+                    if line.startswith('Nama Aqiqah:'):
+                        # Bold untuk "Nama Aqiqah: [value]"
+                        run_label = p.add_run('Nama Aqiqah: ')
+                        run_label.font.bold = True
+                        run_label.font.name = 'Arial'
+                        run_label.font.size = Pt(10)
+                        
+                        run_value = p.add_run(line.replace('Nama Aqiqah: ', ''))
+                        run_value.font.bold = True
+                        run_value.font.name = 'Arial'
+                        run_value.font.size = Pt(10)
+                    elif line.startswith('Cabang:'):
+                        # Cabang dengan warna berdasarkan value
+                        run_label = p.add_run('Cabang: ')
+                        run_label.font.name = 'Arial'
+                        run_label.font.size = Pt(10)
+                        
+                        cabang_value = line.replace('Cabang: ', '')
+                        run_value = p.add_run(cabang_value)
+                        run_value.font.name = 'Arial'
+                        run_value.font.size = Pt(10)
+                        
+                        if 'Cibubur' in cabang_value:
+                            run_value.font.bold = True
+                            run_value.font.color.rgb = RGBColor(0, 0, 255)
+                        elif 'JaDeTa' in cabang_value:
+                            run_value.font.bold = True
+                            run_value.font.color.rgb = RGBColor(255, 0, 0)
+                    else:
+                        # Normal text untuk line lainnya
+                        run = p.add_run(line)
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(10)
+                
+                # Kolom 2: Detail Waktu dengan Tgl Kirim di bold
+                cell_col2 = row_cells[1]
+                cell_col2.text = ''
+                detail_waktu = str(record['Detail Waktu'])
+                
+                for line in detail_waktu.split('\n'):
+                    if cell_col2.text == '':
+                        p = cell_col2.paragraphs[0]
+                    else:
+                        p = cell_col2.add_paragraph()
+                    
+                    if line.startswith('Tgl Kirim:'):
+                        # Bold untuk "Tgl Kirim: [value]"
+                        run_label = p.add_run('Tgl Kirim: ')
+                        run_label.font.bold = True
+                        run_label.font.name = 'Arial'
+                        run_label.font.size = Pt(10)
+                        
+                        run_value = p.add_run(line.replace('Tgl Kirim: ', ''))
+                        run_value.font.bold = True
+                        run_value.font.name = 'Arial'
+                        run_value.font.size = Pt(10)
+                    else:
+                        # Normal text untuk line lainnya
+                        run = p.add_run(line)
+                        run.font.name = 'Arial'
+                        run.font.size = Pt(10)
+                
+                # Kolom 3: Menu di bold semua
+                cell_col3 = row_cells[2]
+                cell_col3.text = ''
+                menu_text = str(record['Menu'])
+                
+                p = cell_col3.paragraphs[0]
+                run = p.add_run(menu_text)
+                run.font.bold = True
+                run.font.name = 'Arial'
+                run.font.size = Pt(10)
+                
+                # Kolom 4: Berat normal
+                cell_col4 = row_cells[3]
+                cell_col4.text = str(record['Berat'])
+
+            # Atur format untuk seluruh tabel
             for row in table.rows:
                 row.height = Cm(4.5)
-                for cell in row.cells:
-                    text_to_check = cell.text
-                    for paragraph in cell.paragraphs:
-                        paragraph.paragraph_format.line_spacing = 1.3
-                        for run in paragraph.runs:
-                            run.font.name = 'Arial'
-                            run.font.size = Pt(10)
-                            if "Cibubur" in text_to_check:
-                                run.font.bold = True
-                                run.font.color.rgb = RGBColor(0, 0, 255)
-                            elif "JaDeTa" in text_to_check:
-                                run.font.bold = True
-                                run.font.color.rgb = RGBColor(255, 0, 0)
-            
+
+            # Atur lebar kolom
             table.columns[0].width = Cm(5.64)
             table.columns[1].width = Cm(2.75)
             table.columns[2].width = Cm(5.29)
             table.columns[3].width = Cm(1.76)
-            
+
             if i + 5 < len(df_final):
                 doc.add_page_break()
-        
+
         doc_io = io.BytesIO()
         doc.save(doc_io)
         doc_io.seek(0)
+        
         return doc_io
+
     except Exception as e:
-        st.error(f"Terjadi kesalahan pada pembuatan Label Masak: {e}")
-        import traceback
-        st.text(traceback.format_exc())
+        st.error(f"Terjadi kesalahan: {e}")
+        st.warning("Pastikan file yang diunggah adalah template yang benar dan memiliki struktur data yang sesuai.")
         return None
 
 # =============================================================================
@@ -496,10 +587,10 @@ elif menu_pilihan == "Label Masak":
     st.write("Unggah file template Excel untuk membuat label masak dalam format Microsoft Word.")
     uploaded_file_label = st.file_uploader("Pilih File Template Excel", type=['xlsx'], key="label_masak")
     if uploaded_file_label is not None:
-        st.info(f"✔️ File '{uploaded_file_label.name}' diterima. Memproses...")
-        word_file_buffer = transform_and_create_word_label(uploaded_file_label)
-        if word_file_buffer:
-            st.success("🎉 Dokumen Word berhasil dibuat!")
+        with st.spinner(f"⏳ Memproses file '{uploaded_file_label.name}'..."):
+            word_file_buffer = transform_and_create_word_label(uploaded_file_label)
+        if word_file_buffer is not None:
+            st.success("✅ Dokumen Word berhasil dibuat!")
             now = datetime.datetime.now()
             download_filename_word = now.strftime("%d_%m_%Y-%H_%M") + "-Label_Masak.docx"
             st.download_button(
