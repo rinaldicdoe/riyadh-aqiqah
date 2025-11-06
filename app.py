@@ -4,6 +4,11 @@ import io
 import openpyxl 
 import datetime
 import os
+import re
+import shutil
+import zipfile
+from zipfile import ZipFile
+import tempfile
 # Import library untuk Word
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
@@ -11,6 +16,461 @@ from docx.shared import Cm, Pt, RGBColor
 # Initialize session state
 if 'missing_items' not in st.session_state:
     st.session_state.missing_items = None
+
+# ============================================================
+# HELPER FUNCTIONS: EXCEL READING WITH ROBUST HANDLING
+# ============================================================
+def repair_xlsx_file(file_path):
+    """
+    Memperbaiki file XLSX dengan XML yang invalid dengan cara:
+    1. Ekstrak file XLSX (yang merupakan ZIP)
+    2. Perbaiki XML yang invalid di SEMUA file
+    3. Kembalikan file yang diperbaiki
+    """
+    try:
+        # Coba import lxml jika tersedia
+        try:
+            from lxml import etree
+            use_lxml = True
+        except ImportError:
+            use_lxml = False
+        
+        # Buat direktori sementara untuk ekstraksi
+        extract_dir = tempfile.mkdtemp()
+        repaired_path = file_path + ".repaired.xlsx"
+        
+        try:
+            # Ekstrak XLSX
+            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            # Cari SEMUA file XML di dalam XLSX
+            xl_dir = os.path.join(extract_dir, 'xl')
+            if os.path.exists(xl_dir):
+                for root, dirs, files in os.walk(xl_dir):
+                    for file in files:
+                        if file.endswith('.xml') or file.endswith('.rels'):
+                            xml_file = os.path.join(root, file)
+                            try:
+                                with open(xml_file, 'rb') as f:
+                                    content = f.read()
+                                
+                                # Hapus karakter invalid
+                                content = content.replace(b'\x00', b'')
+                                
+                                # Hapus karakter kontrol yang tidak diizinkan XML (kecuali tab, newline, carriage return)
+                                content = re.sub(b'[\x00-\x08\x0b\x0c\x0e-\x1f]', b'', content)
+                                
+                                if use_lxml:
+                                    try:
+                                        from lxml import etree
+                                        parser = etree.XMLParser(recover=True, remove_blank_text=False)
+                                        tree = etree.fromstring(content, parser)
+                                        with open(xml_file, 'wb') as f:
+                                            f.write(etree.tostring(tree, xml_declaration=True, encoding='UTF-8', standalone=True))
+                                    except:
+                                        # Tulis kembali content yang sudah dibersihkan
+                                        with open(xml_file, 'wb') as f:
+                                            f.write(content)
+                                else:
+                                    # Jika lxml tidak ada, tulis kembali content yang sudah dibersihkan
+                                    with open(xml_file, 'wb') as f:
+                                        f.write(content)
+                            except Exception as e:
+                                pass
+            
+            # Rekompres XLSX
+            with zipfile.ZipFile(repaired_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(extract_dir):
+                    for file in files:
+                        file_path_full = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path_full, extract_dir)
+                        zipf.write(file_path_full, arcname)
+            
+            return repaired_path
+        finally:
+            # Bersihkan direktori sementara
+            shutil.rmtree(extract_dir, ignore_errors=True)
+    except Exception as e:
+        return None
+
+def read_excel_robust(uploaded_file, header=None):
+    """
+    Membaca file Excel dengan penanganan untuk file yang belum di-enable editing.
+    Jika pembacaan normal gagal, coba beberapa metode alternatif.
+    Selalu membaca sheet pertama (index 0).
+    """
+    filename = uploaded_file.name
+    last_error = None
+    tmp_files_to_clean = []
+    
+    try:
+        # Metode 1: Pembacaan normal dengan data_only=False
+        try:
+            if filename.endswith('.xlsx'):
+                uploaded_file.seek(0)
+                df = pd.read_excel(uploaded_file, sheet_name=0, header=header, engine='openpyxl', engine_kwargs={'data_only': False})
+                return df
+        except Exception as e:
+            last_error = str(e)
+        
+        # Metode 2: Simpan ke file sementara dan coba dengan load_workbook yang lebih permisif
+        try:
+            uploaded_file.seek(0)
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+                tmp_file.write(uploaded_file.getbuffer())
+                tmp_path = tmp_file.name
+            tmp_files_to_clean.append(tmp_path)
+            
+            # Coba membuka workbook dengan keep_vba=False untuk menghindari XML issues
+            wb = openpyxl.load_workbook(tmp_path, keep_vba=False, data_only=False)
+            
+            # Ambil sheet pertama
+            ws = wb.worksheets[0]
+            
+            # Baca data dari worksheet
+            data = []
+            for row in ws.iter_rows(values_only=True):
+                data.append(row)
+            
+            # Tentukan header
+            if header is None:
+                df = pd.DataFrame(data)
+            elif isinstance(header, int):
+                df = pd.DataFrame(data[header+1:])
+                df.columns = data[header]
+            else:
+                df = pd.DataFrame(data)
+            
+            return df
+        except Exception as e:
+            last_error = str(e)
+        
+        # Metode 3: Perbaiki file XLSX terlebih dahulu, kemudian baca
+        try:
+            uploaded_file.seek(0)
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+                tmp_file.write(uploaded_file.getbuffer())
+                tmp_path = tmp_file.name
+            tmp_files_to_clean.append(tmp_path)
+            
+            # Perbaiki file XLSX
+            repaired_path = repair_xlsx_file(tmp_path)
+            if repaired_path:
+                tmp_files_to_clean.append(repaired_path)
+                
+                try:
+                    # Coba baca file yang sudah diperbaiki dengan openpyxl
+                    wb = openpyxl.load_workbook(repaired_path, keep_vba=False, data_only=False)
+                    ws = wb.worksheets[0]
+                    data = []
+                    for row in ws.iter_rows(values_only=True):
+                        data.append(row)
+                    
+                    if header is None:
+                        df = pd.DataFrame(data)
+                    elif isinstance(header, int):
+                        df = pd.DataFrame(data[header+1:])
+                        df.columns = data[header]
+                    else:
+                        df = pd.DataFrame(data)
+                    
+                    return df
+                except Exception as e:
+                    last_error = str(e)
+                
+                # Jika openpyxl masih gagal, coba pandas dengan repaired file
+                try:
+                    df = pd.read_excel(repaired_path, sheet_name=0, header=header, engine='openpyxl')
+                    return df
+                except Exception as e:
+                    last_error = str(e)
+        except Exception as e:
+            last_error = str(e)
+        
+        # Metode 4: Coba dengan engine default pandas pada file original
+        try:
+            uploaded_file.seek(0)
+            df = pd.read_excel(uploaded_file, sheet_name=0, header=header)
+            return df
+        except Exception as e:
+            last_error = str(e)
+        
+        # Metode 5: Ekstrak styles.xml yang corrupt dan baca tanpa styling
+        try:
+            uploaded_file.seek(0)
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+                tmp_file.write(uploaded_file.getbuffer())
+                tmp_path = tmp_file.name
+            tmp_files_to_clean.append(tmp_path)
+            
+            # Ekstrak dan hapus styles.xml yang corrupt
+            extract_dir = tempfile.mkdtemp()
+            
+            with zipfile.ZipFile(tmp_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            styles_path = os.path.join(extract_dir, 'xl', 'styles.xml')
+            if os.path.exists(styles_path):
+                try:
+                    os.remove(styles_path)
+                except:
+                    pass
+            
+            # Rekompres tanpa styles.xml
+            new_tmp_path = tmp_path + ".no_styles.xlsx"
+            with zipfile.ZipFile(new_tmp_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(extract_dir):
+                    for file in files:
+                        file_path_full = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path_full, extract_dir)
+                        zipf.write(file_path_full, arcname)
+            
+            tmp_files_to_clean.append(new_tmp_path)
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            
+            # Coba baca file tanpa styles
+            try:
+                wb = openpyxl.load_workbook(new_tmp_path, keep_vba=False, data_only=False)
+                ws = wb.worksheets[0]
+                data = []
+                for row in ws.iter_rows(values_only=True):
+                    data.append(row)
+                
+                if header is None:
+                    df = pd.DataFrame(data)
+                elif isinstance(header, int):
+                    df = pd.DataFrame(data[header+1:])
+                    df.columns = data[header]
+                else:
+                    df = pd.DataFrame(data)
+                
+                return df
+            except Exception as e:
+                last_error = str(e)
+                try:
+                    df = pd.read_excel(new_tmp_path, sheet_name=0, header=header)
+                    return df
+                except Exception as e:
+                    last_error = str(e)
+        except Exception as e:
+            last_error = str(e)
+        
+        # Jika semua metode gagal, lempar error
+        raise Exception(f"Tidak dapat membaca file Excel. File mungkin corrupt atau formatnya tidak valid. Silakan coba: 1) Buka file di Excel dan Save As, 2) Atau unggah sebagai CSV. Error: {last_error}")
+    
+    finally:
+        # Bersihkan file sementara
+        for tmp_file in tmp_files_to_clean:
+            try:
+                if os.path.exists(tmp_file):
+                    os.unlink(tmp_file)
+            except:
+                pass
+
+# ============================================================
+# HELPER FUNCTIONS: EXCEL FORMATTING
+# ============================================================
+def format_rekap_pemotongan_excel(writer, df):
+    """
+    Format Excel untuk Rekap Pemotongan dengan:
+    - Font size 22 untuk semua cell
+    - Table format
+    - Column width yang sesuai
+    - Warna untuk kata-kata tertentu
+    """
+    workbook = writer.book
+    worksheet = writer.sheets['Hasil Rekap Pemotongan']
+    
+    # Define base formats
+    header_format = workbook.add_format({
+        'font_size': 22,
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1,
+        'bg_color': '#D3D3D3'
+    })
+    
+    cell_format = workbook.add_format({
+        'font_size': 22,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    cell_center_format = workbook.add_format({
+        'font_size': 22,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    # Format warna untuk Tanggal Kirim = Tanggal Potong (dark yellow text)
+    date_same_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': "#B74706",  # Dark yellow
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    # Format warna font untuk kolom M (Paket)
+    paket_jantan_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#00B050',  # Green
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    paket_kebuli_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#FF8C00',  # Orange
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    # Format warna font untuk kolom P (Pemotongan Disaksikan)
+    pemotongan_live_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#0070C0',  # Blue
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    pemotongan_disaksikan_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': "#CA6F00",  # Yellow
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    # Format warna font untuk kolom Q (Catatan Khusus)
+    catatan_yellow_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': "#B79602",  # Yellow
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    # Set page layout
+    worksheet.set_margins(left=0.28, right=0.28, top=0.75, bottom=0.75)
+    worksheet.set_landscape()
+    worksheet.hide_gridlines(2)
+    worksheet.fit_to_pages(1, 0)  # Fit to 1 page wide, unlimited pages tall
+    worksheet.set_zoom(70)  # Zoom ke 70% agar lebih rapi dilihat
+    
+    # Set column widths dengan text wrap
+    col_widths = {
+        'A': 8,      # Nomor
+        'B': 16,     # Cabang
+        'C': 16,     # Tanggal Kirim
+        'D': 16,     # Tanggal Potong
+        'E': 20,     # No. Invoice
+        'F': 22,     # Status Perkembangan
+        'G': 18,     # Pemotongan Real
+        'H': 20,     # Nama Anak
+        'I': 18,     # Jenis Kelamin Anak
+        'J': 20,     # Nama Bapak
+        'K': 18,     # Telpon 1
+        'L': 18,     # Telpon 2
+        'M': 20,     # Paket
+        'N': 14,     # Jumlah
+        'O': 24,     # Menu
+        'P': 24,     # Pemotongan Disaksikan
+        'Q': 35,     # Catatan Khusus
+        'R': 12      # CS
+    }
+    
+    for col, width in col_widths.items():
+        worksheet.set_column(f'{col}:{col}', width)
+    
+    # PERTAMA: Write header SEBELUM data dengan font size 22
+    for col_num, value in enumerate(df.columns.values):
+        worksheet.write(0, col_num, value, header_format)
+    # Set auto height untuk header dengan minimum 35
+    worksheet.set_row(0, None)  # Auto height
+    
+    # KEDUA: FORMAT data rows yang sudah ditulis to_excel dengan format yang sesuai
+    # Data sudah ada di row 1+ dari to_excel, kita tinggal apply format saja
+    for row_num in range(1, len(df) + 1):
+        worksheet.set_row(row_num, None)  # Auto height untuk data rows
+        
+        # Format setiap cell di row ini
+        for col_num, cell_value in enumerate(df.iloc[row_num - 1].values):
+            # Default format
+            fmt = cell_format
+            col_name = df.columns[col_num]
+            cell_str = str(cell_value).strip() if cell_value is not None else ''
+            row_data = df.iloc[row_num - 1]  # Get row data untuk comparisons
+            
+            # === KOLOM C & D: Cek jika Tanggal Kirim = Tanggal Potong ===
+            if col_name == 'Tanggal Kirim':
+                # Bandingkan dengan Tanggal Potong (kolom D)
+                tanggal_potong = str(row_data[3]).strip() if row_data[3] is not None else ''
+                if cell_str == tanggal_potong:
+                    fmt = date_same_format
+                else:
+                    fmt = cell_center_format
+            
+            elif col_name == 'Tanggal Potong':
+                tanggal_kirim = str(row_data[2]).strip() if row_data[2] is not None else ''
+                if cell_str == tanggal_kirim:
+                    fmt = date_same_format
+                else:
+                    fmt = cell_center_format
+            
+            # === KOLOM M: Paket - Cek Jantan atau Kebuli ===
+            elif col_name == 'Paket':
+                if 'jantan' in cell_str.lower():
+                    fmt = paket_jantan_format
+                elif 'kebuli' in cell_str.lower():
+                    fmt = paket_kebuli_format
+                else:
+                    fmt = cell_format
+            
+            # === KOLOM P: Pemotongan Disaksikan - Cek Live Video Call atau Disaksikan ===
+            elif col_name == 'Pemotongan Disaksikan':
+                if 'live video call' in cell_str.lower():
+                    fmt = pemotongan_live_format
+                elif 'disaksikan' in cell_str.lower():
+                    fmt = pemotongan_disaksikan_format
+                else:
+                    fmt = cell_format
+            
+            # === KOLOM Q: Catatan Khusus - Cek Domba, Kambing, Upgrade Bobot, atau Bukan Aqiqah ===
+            elif col_name == 'Catatan Khusus':
+                keywords = ['domba', 'kambing', 'upgrade bobot', 'bukan aqiqah']
+                if any(keyword in cell_str.lower() for keyword in keywords):
+                    fmt = catatan_yellow_format
+                else:
+                    fmt = cell_format
+            
+            # === KOLOM Nomor, Jumlah, Jenis Kelamin Anak - Center Aligned ===
+            elif col_name in ['Nomor', 'Jumlah', 'Jenis Kelamin Anak']:
+                fmt = cell_center_format
+            
+            worksheet.write(row_num, col_num, cell_value, fmt)
 
 # ============================================================
 # HELPER FUNCTIONS: KATEGORI MANAGEMENT
@@ -57,7 +517,7 @@ def update_kategori(idx, nama_barang, kategori_final):
 def transform_rekap_pemotongan(uploaded_file):
     try:
         if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl', engine_kwargs={'data_only': True})
+            df = read_excel_robust(uploaded_file, header=1)
         elif uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file, header=1)
         else:
@@ -65,7 +525,7 @@ def transform_rekap_pemotongan(uploaded_file):
             return None
     except Exception as e:
         st.error(f"Gagal membaca file: {e}")
-        st.warning("Tips: Jika file .xlsx Anda error, coba simpan sheet 'Status Pesanan Penjualan' sebagai file CSV dan unggah kembali file CSV tersebut.")
+        st.warning("Tips: Jika file .xlsx Anda error, coba simpan sheet pertama sebagai file CSV dan unggah kembali file CSV tersebut.")
         return None
 
     df.dropna(subset=['Cabang'], inplace=True)
@@ -123,10 +583,10 @@ def transform_rekap_pemotongan(uploaded_file):
 # =============================================================================
 def transform_rekap_kebutuhan(file_sales):
     try:
-        df_sales = pd.read_excel(file_sales, sheet_name="Status Pesanan Penjualan", header=1, engine='openpyxl', engine_kwargs={'data_only': True})
+        df_sales = read_excel_robust(file_sales, header=1)
     except Exception as e:
         st.error(f"Gagal membaca file: {e}")
-        st.warning("Pastikan nama sheet pada file sales adalah 'Status Pesanan Penjualan'.")
+        st.warning("Pastikan file Excel Anda valid dan berisi data yang sesuai.")
         return None
 
     # Load kategori from external file
@@ -227,13 +687,8 @@ def transform_and_create_word_label(file_input):
     Membaca file Excel, mentransformasikannya, dan menghasilkan file Word.
     """
     try:
-        # Try to read the specific sheet, if not found, read the first sheet
-        try:
-            df = pd.read_excel(file_input, sheet_name="Status Pesanan Penjualan", header=1)
-        except ValueError:
-            # Sheet not found, try reading the first sheet
-            st.info("⚠️ Sheet 'Status Pesanan Penjualan' tidak ditemukan. Membaca sheet pertama...")
-            df = pd.read_excel(file_input, sheet_name=0, header=1)
+        # Baca sheet pertama
+        df = read_excel_robust(file_input, header=1)
         
         df.dropna(subset=['No. Invoice'], inplace=True)
         df = df[df['Cabang'] != 'Cabang'].copy()
@@ -424,24 +879,12 @@ if menu_pilihan == "Rekap Pemotongan":
             st.dataframe(result_df_rekap)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                result_df_rekap.to_excel(writer, index=False, sheet_name='Hasil Rekap Pemotongan')
-                workbook = writer.book
-                worksheet = writer.sheets['Hasil Rekap Pemotongan']
-                general_format = workbook.add_format({'font_size': 22, 'valign': 'vcenter', 'align': 'center', 'text_wrap': True})
-                header_format = workbook.add_format({'font_size': 22, 'bold': True, 'valign': 'vcenter', 'align': 'center', 'text_wrap': True})
-                worksheet.set_margins(left=0.28, right=0.28, top=0.75, bottom=0.75)
-                worksheet.set_landscape()
-                worksheet.set_default_row(257)
-                worksheet.set_row(0, 60, header_format)
-                worksheet.hide_gridlines(2)
-                worksheet.fit_to_pages(1, 0)
-                worksheet.set_column('A:A', 7.40); worksheet.set_column('B:B', 15.27); worksheet.set_column('C:D', 26.07)
-                worksheet.set_column('E:E', 22.47); worksheet.set_column('F:F', 13.27); worksheet.set_column('G:G', 20)
-                worksheet.set_column('H:L', 22.73); worksheet.set_column('M:M', 32.47); worksheet.set_column('N:N', 15)
-                worksheet.set_column('O:O', 35); worksheet.set_column('P:P', 25); worksheet.set_column('Q:Q', 45)
-                worksheet.set_column('R:R', 7.40)
-                (max_row, max_col) = result_df_rekap.shape
-                worksheet.set_column(0, max_col - 1, None, general_format)
+                # JANGAN gunakan to_excel dengan header=True karena akan overwrite format
+                # Tulis data tanpa header terlebih dahulu
+                result_df_rekap.to_excel(writer, index=False, sheet_name='Hasil Rekap Pemotongan', 
+                                        startrow=1, startcol=0, header=False)
+                # Sekarang format function akan menulis header di row 0 dengan font size 22
+                format_rekap_pemotongan_excel(writer, result_df_rekap)
             excel_data = output.getvalue()
             now = datetime.datetime.now()
             download_filename = now.strftime("%d_%m_%Y-%H_%M") + "-Rekap_Pemotongan.xlsx"
