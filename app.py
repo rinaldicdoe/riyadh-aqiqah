@@ -3,9 +3,53 @@ import pandas as pd
 import io
 import openpyxl 
 import datetime
+import os
 # Import library untuk Word
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
+
+# Initialize session state
+if 'missing_items' not in st.session_state:
+    st.session_state.missing_items = None
+
+# ============================================================
+# HELPER FUNCTIONS: KATEGORI MANAGEMENT
+# ============================================================
+KATEGORI_FILE = "kategori.csv"
+
+def load_kategori():
+    """Load kategori from CSV file, return empty df if not exists"""
+    if os.path.exists(KATEGORI_FILE):
+        return pd.read_csv(KATEGORI_FILE)
+    return pd.DataFrame(columns=['Nama Barang', 'Kategori Final'])
+
+def save_kategori(df):
+    """Save kategori to CSV file"""
+    df.to_csv(KATEGORI_FILE, index=False)
+    st.success("✅ Kategori berhasil disimpan!")
+
+def add_kategori(nama_barang, kategori_final):
+    """Add new kategori entry"""
+    df_kat = load_kategori()
+    new_row = pd.DataFrame({'Nama Barang': [nama_barang], 'Kategori Final': [kategori_final]})
+    df_kat = pd.concat([df_kat, new_row], ignore_index=True)
+    save_kategori(df_kat)
+    return df_kat
+
+def delete_kategori(idx):
+    """Delete kategori by index"""
+    df_kat = load_kategori()
+    df_kat = df_kat.drop(idx).reset_index(drop=True)
+    save_kategori(df_kat)
+    return df_kat
+
+def update_kategori(idx, nama_barang, kategori_final):
+    """Update kategori entry"""
+    df_kat = load_kategori()
+    df_kat.at[idx, 'Nama Barang'] = nama_barang
+    df_kat.at[idx, 'Kategori Final'] = kategori_final
+    save_kategori(df_kat)
+    return df_kat
 
 # =============================================================================
 # FUNGSI 1: TRANSFORMASI REKAP PEMOTONGAN
@@ -85,157 +129,91 @@ def transform_rekap_kebutuhan(file_sales):
         st.warning("Pastikan nama sheet pada file sales adalah 'Status Pesanan Penjualan'.")
         return None
 
-    # kategori mapping data (semicolon-separated) — replaced with provided data
-    kategori_csv_data = """Nama Barang;Kelompok 
-Paket Aqiqah Domba Kebuli - Betina;Paket Aqiqah Domba Kebuli - Betina
-Paket Aqiqah Domba Kebuli - Betina (Nasi Biasa);Paket Aqiqah Domba Kebuli - Betina
-Paket Aqiqah Domba Kebuli - Jantan;Paket Aqiqah Domba Kebuli - Jantan
-Paket Aqiqah Domba Kebuli - Jantan (Nasi Biasa);Paket Aqiqah Domba Kebuli - Jantan
-Paket Aqiqah Domba Tipe A - Betina;Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A - Betina (Bento Spesial);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A - Betina (Hemat);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A - Betina (Spesial);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A (Hemat) - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina
-Paket Aqiqah Domba Tipe A (Hemat) - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Jantan;Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Jantan (Spesial);Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Jantan (Hemat);Paket Aqiqah Domba Tipe A - Jantan
-Paket Aqiqah Domba Tipe A - Betina (Plus);Paket Aqiqah Domba Tipe A - Betina (Plus)
-Paket Aqiqah Domba Tipe A (Plus) - Betina (Spesial);Paket Aqiqah Domba Tipe A - Betina (Plus)
-Paket Aqiqah Domba Tipe A (Plus) - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Betina (Plus)
-Paket Aqiqah Domba Tipe A - Jantan (Plus);Paket Aqiqah Domba Tipe A - Jantan (Plus)
-Paket Aqiqah Domba Tipe A (Plus) - Jantan (Spesial);Paket Aqiqah Domba Tipe A - Jantan (Plus)
-Paket Aqiqah Domba Tipe A (Plus) - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe A - Jantan (Plus)
-Paket Aqiqah Domba Tipe B - Betina;Paket Aqiqah Domba Tipe B - Betina
-Paket Aqiqah Domba Tipe B - Betina (Spesial);Paket Aqiqah Domba Tipe B - Betina
-Paket Aqiqah Domba Tipe B - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe B - Betina
-Paket Aqiqah Domba Tipe B - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe B - Betina
-Paket Aqiqah Domba Tipe B - Jantan;Paket Aqiqah Domba Tipe B - Jantan
-Paket Aqiqah Domba Tipe B - Jantan (Spesial);Paket Aqiqah Domba Tipe B - Jantan
-Paket Aqiqah Domba Tipe B - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe B - Jantan
-Paket Aqiqah Domba Tipe B - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe B - Jantan
-Paket Aqiqah Domba Tipe C - Betina;Paket Aqiqah Domba Tipe C - Betina
-Paket Aqiqah Domba Tipe C - Betina (Spesial);Paket Aqiqah Domba Tipe C - Betina
-Paket Aqiqah Domba Tipe C - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe C - Betina
-Paket Aqiqah Domba Tipe C - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe C - Betina
-Paket Aqiqah Domba Tipe C - Jantan;Paket Aqiqah Domba Tipe C - Jantan
-Paket Aqiqah Domba Tipe C - Jantan (Spesial);Paket Aqiqah Domba Tipe C - Jantan
-Paket Aqiqah Domba Tipe C - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe C - Jantan
-Paket Aqiqah Domba Tipe C - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe C - Jantan
-Paket Aqiqah Domba Tipe D - Betina;Paket Aqiqah Domba Tipe D - Betina
-Paket Aqiqah Domba Tipe D - Betina (Spesial);Paket Aqiqah Domba Tipe D - Betina
-Paket Aqiqah Domba Tipe D - Betina (Tanpa Masak);Paket Aqiqah Domba Tipe D - Betina
-Paket Aqiqah Domba Tipe D - Betina (Tanpa Nasi Box);Paket Aqiqah Domba Tipe D - Betina
-Paket Aqiqah Domba Tipe D - Jantan;Paket Aqiqah Domba Tipe D - Jantan
-Paket Aqiqah Domba Tipe D - Jantan (Spesial);Paket Aqiqah Domba Tipe D - Jantan
-Paket Aqiqah Domba Tipe D - Jantan (Tanpa Masak);Paket Aqiqah Domba Tipe D - Jantan
-Paket Aqiqah Domba Tipe D - Jantan (Tanpa Nasi Box);Paket Aqiqah Domba Tipe D - Jantan
-"""
-    df_kategori = pd.read_csv(io.StringIO(kategori_csv_data), sep=';')
-    df_kategori.dropna(subset=['Nama Barang'], inplace=True)
-    if 'Kelompok ' in df_kategori.columns:
-        df_kategori.rename(columns={'Kelompok ': 'Paket & Menu Kategori'}, inplace=True)
-    elif 'Kelompok' in df_kategori.columns:
-        df_kategori.rename(columns={'Kelompok': 'Paket & Menu Kategori'}, inplace=True)
-
-    # Use Tanggal Kirim instead of Tanggal Potong for column headers
-    df_sales['Tanggal Kirim'] = pd.to_datetime(df_sales['Tanggal Kirim'], errors='coerce')
-    # Drop rows where Tanggal Kirim is blank/null
+    # Load kategori from external file
+    df_kategori = load_kategori()
+    
+    # Clean up data
     df_sales.dropna(subset=['Tanggal Kirim', 'No. Invoice'], inplace=True)
     df_sales = df_sales[df_sales['Cabang'] != 'Cabang'].copy()
-    cols_to_keep = ["Tanggal Kirim", "No. Invoice", "Paket & Menu", "Jumlah", "Satuan"]
-    df_sales = df_sales[cols_to_keep]
     
-    # Split data into EKOR and non-EKOR
-    df_ekor = df_sales[df_sales['Satuan'] == 'EKOR'].copy()
-    df_non_ekor = df_sales[df_sales['Satuan'] != 'EKOR'].copy()
+    # Parse dates
+    df_sales['Tanggal Kirim'] = pd.to_datetime(df_sales['Tanggal Kirim'], errors='coerce')
     
-    # Process EKOR data (Paket Aqiqah)
-    df_ekor['Paket & Menu'] = df_ekor['Paket & Menu'].str.replace('Paket Aqiqah ', '', regex=False)
-    df_ekor = df_ekor.drop(columns=["No. Invoice", "Satuan"])
-    df_grouped_ekor = df_ekor.groupby(["Tanggal Kirim", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
+    # Get Paket & Menu from column Q (index 16) and Jumlah from column R (index 17)
+    try:
+        # Get the column names (Excel might have them or might not)
+        if 'Paket & Menu' not in df_sales.columns:
+            # Try by column index
+            paket_col = df_sales.iloc[:, 16]
+            jumlah_col = df_sales.iloc[:, 17]
+        else:
+            paket_col = df_sales['Paket & Menu']
+            jumlah_col = df_sales['Jumlah']
+        
+        df_sales['Paket & Menu'] = paket_col
+        df_sales['Jumlah'] = pd.to_numeric(jumlah_col, errors='coerce').fillna(0).astype(int)
+    except Exception as e:
+        st.error(f"Tidak dapat menemukan data paket & menu atau jumlah: {e}")
+        return None
     
-    # Process non-EKOR data (Menu items)
-    df_non_ekor = df_non_ekor.drop(columns=["No. Invoice", "Satuan"])
-    df_grouped_non_ekor = df_non_ekor.groupby(["Tanggal Kirim", "Paket & Menu"]).agg(Jumlah=('Jumlah', 'sum')).reset_index()
+    # Groupby Tanggal Kirim and Paket & Menu, aggregating Jumlah
+    df_grouped = df_sales.groupby(["Tanggal Kirim", "Paket & Menu"])['Jumlah'].sum().reset_index()
+    df_grouped['Jumlah'] = df_grouped['Jumlah'].astype(int)
     
-    # Combine both datasets
-    df_grouped = pd.concat([df_grouped_ekor, df_grouped_non_ekor])
-    
-    # Format dates and create pivot table based on Tanggal Kirim
-    df_grouped['Tanggal Kirim'] = pd.to_datetime(df_grouped['Tanggal Kirim']).dt.strftime('%d-%m-%Y')
-    df_pivot = df_grouped.pivot_table(
-        index='Paket & Menu',
-        columns='Tanggal Kirim',
-        values='Jumlah',
-        aggfunc='sum'
-    ).fillna(0)
-    
-    df_pivot.reset_index(inplace=True)
-    # Add 'Paket Aqiqah' prefix only to EKOR items
-    df_pivot['Kelompok'] = df_pivot['Paket & Menu'].apply(
-        lambda x: 'Paket Aqiqah ' + x if any(df_ekor['Paket & Menu'] == x) else x
+    # Format dates to string for pivot table
+    df_grouped['Tanggal Kirim_str'] = df_grouped['Tanggal Kirim'].apply(
+        lambda x: pd.to_datetime(x).strftime('%d-%m-%Y')
     )
     
-    df_merged = pd.merge(df_pivot, df_kategori[['Nama Barang', 'Paket & Menu Kategori']], left_on='Kelompok', right_on='Nama Barang', how='left')
-
-    if 'Paket & Menu Kategori' in df_merged.columns:
-        df_merged.rename(columns={'Paket & Menu Kategori': 'Paket & Menu Final'}, inplace=True)
-        all_cols = list(df_merged.columns)
-        all_cols.remove('Paket & Menu Final')
-        all_cols.insert(0, 'Paket & Menu Final')
-        df_final = df_merged[all_cols]
-    else:
-        df_final = df_merged.copy()
-
-    cols_to_drop_final = ['Paket & Menu', 'Kelompok', 'Nama Barang']
-    df_final = df_final.drop(columns=cols_to_drop_final, errors='ignore')
-    df_final.rename(columns={'Paket & Menu Final': 'Paket & Menu'}, inplace=True)
+    # Create pivot table
+    df_pivot = df_grouped.pivot_table(
+        index='Paket & Menu',
+        columns='Tanggal Kirim_str',
+        values='Jumlah',
+        aggfunc='sum'
+    ).fillna(0).astype(int)
     
-    df_final.dropna(subset=['Paket & Menu'], inplace=True)
-
-    # --- Order date columns (based on Tanggal Kirim) oldest -> newest (left -> right)
-    # Identify candidate date columns (all columns except the item column)
-    item_col = 'Paket & Menu'
-    other_cols = [c for c in df_final.columns if c != item_col]
-
-    # Try parsing each candidate column as date (format dd-mm-YYYY)
-    parsed_dates = {}
-    for c in other_cols:
-        try:
-            parsed = pd.to_datetime(c, format='%d-%m-%Y', errors='coerce')
-        except Exception:
-            parsed = pd.NaT
-        parsed_dates[c] = parsed
-
-    # Keep only columns that parsed to a valid date, sort them ascending (oldest first)
-    date_cols = [c for c, p in parsed_dates.items() if pd.notna(p)]
-    date_cols_sorted = sorted(date_cols, key=lambda x: parsed_dates[x])
-
-    # Any remaining non-date columns (should be none, but keep safe)
-    remaining_cols = [c for c in other_cols if c not in date_cols_sorted]
-
-    # Final column order: item column, sorted date columns, then any remaining columns
-    final_col_order = [item_col] + date_cols_sorted + remaining_cols
-    # Reindex dataframe to that order (if some columns missing, reindex will keep existing)
-    existing_final_cols = [c for c in final_col_order if c in df_final.columns]
-    df_final = df_final.reindex(columns=existing_final_cols)
-
-    # --- Add TOTAL row at the bottom summing each date column (if any date columns exist)
-    if date_cols_sorted:
-        # Sum numeric values for date columns (ignore non-numeric safely)
-        totals = df_final[date_cols_sorted].sum(numeric_only=True)
-        totals_row = {col: totals.get(col, 0) for col in date_cols_sorted}
-        totals_row[item_col] = 'TOTAL'
-        # Fill any remaining non-date columns with empty string
-        for c in remaining_cols:
-            totals_row[c] = ''
+    df_pivot.reset_index(inplace=True)
+    
+    # Sort date columns
+    date_cols = [c for c in df_pivot.columns if c != 'Paket & Menu']
+    date_cols_sorted = sorted(date_cols, key=lambda x: pd.to_datetime(x, format='%d-%m-%Y'))
+    
+    # Add weekday names to date columns
+    hari_id = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    date_cols_renamed = {}
+    for date_str in date_cols_sorted:
+        date_obj = pd.to_datetime(date_str, format='%d-%m-%Y')
+        weekday_name = hari_id[date_obj.weekday()]
+        new_col_name = f"{weekday_name}: {date_str}"
+        date_cols_renamed[date_str] = new_col_name
+    
+    df_pivot.rename(columns=date_cols_renamed, inplace=True)
+    date_cols_sorted_renamed = [date_cols_renamed[c] for c in date_cols_sorted]
+    
+    # Reorder columns
+    final_col_order = ['Paket & Menu'] + date_cols_sorted_renamed
+    df_final = df_pivot[final_col_order].copy()
+    
+    # Check if items are in kategori and store missing items
+    st.session_state.missing_items = None
+    if len(df_kategori) > 0:
+        missing_items_list = []
+        for item in df_final['Paket & Menu']:
+            if item not in df_kategori['Nama Barang'].values:
+                missing_items_list.append(item)
+        
+        if len(missing_items_list) > 0:
+            df_missing = df_final[df_final['Paket & Menu'].isin(missing_items_list)].copy()
+            st.session_state.missing_items = df_missing
+    
+    # Add TOTAL row at the bottom
+    if len(date_cols_sorted_renamed) > 0:
+        totals_row = {'Paket & Menu': 'TOTAL'}
+        for col in date_cols_sorted_renamed:
+            totals_row[col] = int(df_final[col].sum())
         df_final = pd.concat([df_final, pd.DataFrame([totals_row])], ignore_index=True)
-
+    
     return df_final
 
 # =============================================================================
@@ -379,6 +357,113 @@ if menu_pilihan == "Rekap Pemotongan":
 elif menu_pilihan == "Rekap Kebutuhan Mingguan":
     st.title("📊 Aplikasi Transformasi - Rekap Kebutuhan Mingguan")
     st.write("Unggah **File Status Penjualan** untuk diproses.")
+    
+    # ===== KATEGORI MANAGEMENT (EXPANDER) =====
+    with st.expander("⚙️ Kelola Kategori Paket & Menu", expanded=False):
+        st.subheader("Kategori Saat Ini")
+        df_kategori = load_kategori()
+        
+        if len(df_kategori) > 0:
+            st.dataframe(df_kategori, use_container_width=True, height=250)
+        else:
+            st.info("Belum ada kategori.")
+        
+        # Tab untuk operasi kategori
+        kat_tab1, kat_tab2, kat_tab3 = st.tabs(["➕ Tambah", "✏️ Edit", "🗑️ Hapus"])
+        
+        # TAB 1: Tambah Kategori
+        with kat_tab1:
+            col1, col2 = st.columns(2)
+            with col1:
+                nama_barang_baru = st.text_input("Nama Barang / Paket & Menu:", key="nama_barang_tambah_kat")
+            with col2:
+                kategori_final_baru = st.text_input("Kategori Final:", key="kategori_final_tambah_kat")
+            
+            if st.button("✅ Tambah", key="btn_tambah_kat"):
+                if nama_barang_baru.strip() and kategori_final_baru.strip():
+                    df_kat_check = load_kategori()
+                    if nama_barang_baru in df_kat_check['Nama Barang'].values:
+                        st.warning("⚠️ Nama barang sudah ada.")
+                    else:
+                        add_kategori(nama_barang_baru, kategori_final_baru)
+                        st.rerun()
+                else:
+                    st.error("❌ Tidak boleh kosong!")
+        
+        # TAB 2: Edit Kategori
+        with kat_tab2:
+            df_kat_edit = load_kategori()
+            if len(df_kat_edit) > 0:
+                idx_edit = st.selectbox("Pilih kategori untuk diedit:", 
+                                       range(len(df_kat_edit)), 
+                                       format_func=lambda i: f"{i}. {df_kat_edit.iloc[i]['Nama Barang']}",
+                                       key="select_edit_kat")
+                
+                current_nama = df_kat_edit.iloc[idx_edit]['Nama Barang']
+                current_kategori = df_kat_edit.iloc[idx_edit]['Kategori Final']
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    nama_barang_edit = st.text_input("Nama Barang:", value=current_nama, key="nama_barang_edit_kat")
+                with col2:
+                    kategori_final_edit = st.text_input("Kategori Final:", value=current_kategori, key="kategori_final_edit_kat")
+                
+                if st.button("💾 Simpan", key="btn_edit_kat"):
+                    if nama_barang_edit.strip() and kategori_final_edit.strip():
+                        update_kategori(idx_edit, nama_barang_edit, kategori_final_edit)
+                        st.rerun()
+                    else:
+                        st.error("❌ Tidak boleh kosong!")
+            else:
+                st.info("Tidak ada kategori untuk diedit.")
+        
+        # TAB 3: Hapus Kategori
+        with kat_tab3:
+            df_kat_delete = load_kategori()
+            if len(df_kat_delete) > 0:
+                idx_hapus = st.selectbox("Pilih kategori untuk dihapus:", 
+                                        range(len(df_kat_delete)), 
+                                        format_func=lambda i: f"{i}. {df_kat_delete.iloc[i]['Nama Barang']}",
+                                        key="select_delete_kat")
+                
+                st.warning(f"⚠️ Akan dihapus: **{df_kat_delete.iloc[idx_hapus]['Nama Barang']}**")
+                
+                if st.button("🗑️ Hapus", key="btn_hapus_kat"):
+                    delete_kategori(idx_hapus)
+                    st.rerun()
+            else:
+                st.info("Tidak ada kategori untuk dihapus.")
+        
+        # Backup & Restore
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            df_kat_backup = load_kategori()
+            if st.button("⬇️ Download kategori.csv"):
+                csv_data = df_kat_backup.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download",
+                    data=csv_data,
+                    file_name="kategori_backup.csv",
+                    mime="text/csv"
+                )
+        
+        with col2:
+            uploaded_kategori = st.file_uploader("📤 Upload kategori.csv:", type=['csv'], key="upload_kategori_kat")
+            if uploaded_kategori is not None:
+                try:
+                    df_upload = pd.read_csv(uploaded_kategori)
+                    if 'Nama Barang' in df_upload.columns and 'Kategori Final' in df_upload.columns:
+                        save_kategori(df_upload)
+                        st.rerun()
+                    else:
+                        st.error("❌ Format file salah!")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+    
+    st.divider()
+    
+    # ===== MAIN PROCESSING =====
     uploaded_file_sales = st.file_uploader("Pilih File Excel Penjualan", type=['xlsx'], key="status_penjualan")
     if uploaded_file_sales:
         st.info(f"✔️ File '{uploaded_file_sales.name}' diterima. Memproses...")
@@ -386,6 +471,27 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
         if result_df_kebutuhan is not None:
             st.success("🎉 Transformasi data berhasil!")
             st.dataframe(result_df_kebutuhan)
+            
+            # --- Display items not in kategori ---
+            if 'missing_items' in st.session_state and st.session_state.missing_items is not None:
+                df_missing = st.session_state.missing_items
+                if len(df_missing) > 0:
+                    st.warning("⚠️ **Item yang tidak ada di Kategori:**")
+                    
+                    # Prepare display with total from last date column (R)
+                    display_cols = df_missing.columns.tolist()
+                    if len(display_cols) > 1:
+                        # Get last date column (R column)
+                        last_date_col = display_cols[-1]
+                        
+                        # Create summary df: Paket & Menu with total from last column
+                        df_display = df_missing[['Paket & Menu', last_date_col]].copy()
+                        df_display.rename(columns={last_date_col: 'Total (Kolom R)'}, inplace=True)
+                        df_display['Total (Kolom R)'] = df_display['Total (Kolom R)'].astype(int)
+                        df_display.rename(columns={'Paket & Menu': 'Nama Paket & Menu'}, inplace=True)
+                        
+                        st.dataframe(df_display, use_container_width=True)
+            
             output_kebutuhan = io.BytesIO()
             with pd.ExcelWriter(output_kebutuhan, engine='xlsxwriter') as writer:
                 result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Rekap Kebutuhan', startrow=1, header=False)
