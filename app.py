@@ -309,21 +309,35 @@ def format_rekap_pemotongan_excel(writer, df):
         'border': 1
     })
     
-    # Format warna untuk Tanggal Kirim = Tanggal Potong (dark yellow text)
+    # Date format untuk Tanggal Kirim dan Tanggal Potong
+    # Date format sebagai TEXT dengan DD-MM-YYYY (gunakan custom format Excel)
+    date_format = workbook.add_format({
+        'font_size': 22,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1,
+        'num_format': 'dd/mm/yyyy'  # Explicitly DD/MM/YYYY
+    })
+    
+    # Format warna untuk Tanggal Kirim = Tanggal Potong (dark yellow background)
     date_same_format = workbook.add_format({
         'font_size': 22,
-        'font_color': "#B74706",  # Dark yellow
+        'font_color': '#000000',  # Black text
+        'bg_color': "#B74706",  # Dark yellow background
         'bold': True,
         'valign': 'vcenter',
         'align': 'center',
         'text_wrap': True,
-        'border': 1
+        'border': 1,
+        'num_format': 'dd/mm/yyyy'  # Explicitly DD/MM/YYYY
     })
     
-    # Format warna font untuk kolom M (Paket)
+    # Format warna background untuk kolom M (Paket)
     paket_jantan_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#00B050',  # Green
+        'font_color': '#000000',  # Black text
+        'bg_color': '#00B050',  # Green background
         'bold': True,
         'valign': 'vcenter',
         'align': 'left',
@@ -333,7 +347,8 @@ def format_rekap_pemotongan_excel(writer, df):
     
     paket_kebuli_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#FF8C00',  # Orange
+        'font_color': '#000000',  # Black text
+        'bg_color': '#FF8C00',  # Orange background
         'bold': True,
         'valign': 'vcenter',
         'align': 'left',
@@ -341,10 +356,11 @@ def format_rekap_pemotongan_excel(writer, df):
         'border': 1
     })
     
-    # Format warna font untuk kolom P (Pemotongan Disaksikan)
+    # Format warna background untuk kolom P (Pemotongan Disaksikan)
     pemotongan_live_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#0070C0',  # Blue
+        'font_color': '#000000',  # Black text
+        'bg_color': '#0070C0',  # Blue background
         'bold': True,
         'valign': 'vcenter',
         'align': 'left',
@@ -354,7 +370,8 @@ def format_rekap_pemotongan_excel(writer, df):
     
     pemotongan_disaksikan_format = workbook.add_format({
         'font_size': 22,
-        'font_color': "#CA6F00",  # Yellow
+        'font_color': "#000000",  # Black text
+        'bg_color': "#CA6F00",  # Yellow background
         'bold': True,
         'valign': 'vcenter',
         'align': 'left',
@@ -362,10 +379,11 @@ def format_rekap_pemotongan_excel(writer, df):
         'border': 1
     })
     
-    # Format warna font untuk kolom Q (Catatan Khusus)
+    # Format warna background untuk kolom Q (Catatan Khusus)
     catatan_yellow_format = workbook.add_format({
         'font_size': 22,
-        'font_color': "#B79602",  # Yellow
+        'font_color': "#000000",  # Black text
+        'bg_color': "#B79602",  # Yellow background
         'bold': True,
         'valign': 'vcenter',
         'align': 'left',
@@ -421,23 +439,53 @@ def format_rekap_pemotongan_excel(writer, df):
             # Default format
             fmt = cell_format
             col_name = df.columns[col_num]
-            cell_str = str(cell_value).strip() if cell_value is not None else ''
             row_data = df.iloc[row_num - 1]  # Get row data untuk comparisons
+            
+            # Handle NaT values - convert to empty string untuk tanggal columns
+            display_value = cell_value
+            if col_name in ['Tanggal Kirim', 'Tanggal Potong'] and pd.isna(cell_value):
+                display_value = ''
+            
+            cell_str = str(cell_value).strip() if cell_value is not None else ''
             
             # === KOLOM C & D: Cek jika Tanggal Kirim = Tanggal Potong ===
             if col_name == 'Tanggal Kirim':
                 # Bandingkan dengan Tanggal Potong (kolom D)
-                tanggal_potong = str(row_data[3]).strip() if row_data[3] is not None else ''
-                if cell_str == tanggal_potong:
-                    fmt = date_same_format
-                else:
+                # Konversi datetime ke date string untuk perbandingan
+                tanggal_potong_val = row_data[3]
+                tanggal_kirim_val = cell_value
+                
+                # Handle datetime objects - extract date part only
+                try:
+                    if pd.notna(tanggal_kirim_val) and pd.notna(tanggal_potong_val):
+                        tanggal_kirim_str = pd.to_datetime(tanggal_kirim_val).strftime('%Y-%m-%d')
+                        tanggal_potong_str = pd.to_datetime(tanggal_potong_val).strftime('%Y-%m-%d')
+                        if tanggal_kirim_str == tanggal_potong_str:
+                            fmt = date_same_format
+                        else:
+                            fmt = date_format
+                    else:
+                        fmt = cell_center_format
+                except:
                     fmt = cell_center_format
             
             elif col_name == 'Tanggal Potong':
-                tanggal_kirim = str(row_data[2]).strip() if row_data[2] is not None else ''
-                if cell_str == tanggal_kirim:
-                    fmt = date_same_format
-                else:
+                # Bandingkan dengan Tanggal Kirim (kolom C)
+                tanggal_kirim_val = row_data[2]
+                tanggal_potong_val = cell_value
+                
+                # Handle datetime objects - extract date part only
+                try:
+                    if pd.notna(tanggal_kirim_val) and pd.notna(tanggal_potong_val):
+                        tanggal_kirim_str = pd.to_datetime(tanggal_kirim_val).strftime('%Y-%m-%d')
+                        tanggal_potong_str = pd.to_datetime(tanggal_potong_val).strftime('%Y-%m-%d')
+                        if tanggal_kirim_str == tanggal_potong_str:
+                            fmt = date_same_format
+                        else:
+                            fmt = date_format
+                    else:
+                        fmt = cell_center_format
+                except:
                     fmt = cell_center_format
             
             # === KOLOM M: Paket - Cek Jantan atau Kebuli ===
@@ -470,7 +518,12 @@ def format_rekap_pemotongan_excel(writer, df):
             elif col_name in ['Nomor', 'Jumlah', 'Jenis Kelamin Anak']:
                 fmt = cell_center_format
             
-            worksheet.write(row_num, col_num, cell_value, fmt)
+            # === Apply date num_format to date columns ===
+            if col_name in ['Tanggal Kirim', 'Tanggal Potong'] and fmt == date_format:
+                # Already has num_format applied in date_format definition
+                pass
+            
+            worksheet.write(row_num, col_num, display_value, fmt)
 
 # ============================================================
 # HELPER FUNCTIONS: KATEGORI MANAGEMENT
@@ -536,9 +589,24 @@ def transform_rekap_pemotongan(uploaded_file):
         df.rename(columns={"Jenis Kelamin AnakNama": "Jenis Kelamin Anak"}, inplace=True)
     if "Pemotongan DisaksikanNama" in df.columns:
         df.rename(columns={"Pemotongan DisaksikanNama": "Pemotongan Disaksikan"}, inplace=True)
-        
-    df['Tanggal Kirim'] = pd.to_datetime(df['Tanggal Kirim'], errors='coerce').dt.date
-    df['Tanggal Potong'] = pd.to_datetime(df['Tanggal Potong'], errors='coerce').dt.date
+    
+    # Parse tanggal - coba format DD/MM/YYYY dulu, jika gagal coba format lain
+    def parse_tanggal(val):
+        if pd.isna(val):
+            return None
+        try:
+            # Coba format DD/MM/YYYY (asumsi input user)
+            return pd.to_datetime(str(val).strip(), format='%d/%m/%Y')
+        except:
+            try:
+                # Coba format lain (auto-detect)
+                result = pd.to_datetime(str(val).strip(), errors='coerce')
+                return result
+            except:
+                return None
+    
+    df['Tanggal Kirim'] = df['Tanggal Kirim'].apply(parse_tanggal)
+    df['Tanggal Potong'] = df['Tanggal Potong'].apply(parse_tanggal)
     
     for col in ['Telpon 1', 'Telpon 2']:
         if col in df.columns:
@@ -550,19 +618,38 @@ def transform_rekap_pemotongan(uploaded_file):
     df_menu_final = df_menu_prep.groupby('No. Invoice')['Menu_Item'].apply(lambda x: ', '.join(x) + ' PORSI').reset_index()
     df_menu_final.rename(columns={'Menu_Item': 'Menu'}, inplace=True)
 
+    # Agregasi Jumlah berdasarkan No. Invoice + Paket & Menu
     df_paket_prep = df[['No. Invoice', 'Paket & Menu', 'Jumlah']].copy()
-    df_paket_final = df_paket_prep[df_paket_prep['Paket & Menu'].astype(str).str.contains("Paket", na=False)].copy()
-    df_paket_final.drop_duplicates(subset=['No. Invoice'], keep='first', inplace=True)
+    df_paket_prep = df_paket_prep[df_paket_prep['Paket & Menu'].astype(str).str.contains("Paket", na=False)].copy()
+    
+    # Convert Jumlah to numeric untuk penjumlahan
+    df_paket_prep['Jumlah'] = pd.to_numeric(df_paket_prep['Jumlah'], errors='coerce').fillna(0).astype(int)
+    
+    # Aggregate berdasarkan KEDUANYA (No. Invoice + Paket & Menu)
+    # Jika No. Invoice sama & Paket sama → jumlahkan Jumlah menjadi 1 row
+    # Jika No. Invoice sama tapi Paket berbeda → tetap terpisah
+    df_paket_final = df_paket_prep.groupby(['No. Invoice', 'Paket & Menu']).agg({
+        'Jumlah': 'sum'
+    }).reset_index()
+    
+    # Jika ada multiple Paket per Invoice, ambil yang pertama (biasanya hanya 1 Paket per Invoice)
+    # Tapi jika ada 2 Paket berbeda, tetap terpisah
+    df_paket_final = df_paket_final.sort_values('No. Invoice').reset_index(drop=True)
     df_paket_final.rename(columns={'Paket & Menu': 'Paket'}, inplace=True)
     
     cols_to_drop = ['Paket & Menu', 'No. Urut', 'No. Domba', 'Satuan',
                     'Tanggal Domba Dipotong', 'Jam Tiba (hh:mm)', 'Jam Kirim (hh:mm)', 'Kode Menu']
     df_base = df.drop(columns=cols_to_drop + ['Jumlah'], errors='ignore')
+    
+    # Aggregate data lain berdasarkan No. Invoice (ambil first row untuk setiap Invoice)
+    # Ini untuk mendapatkan semua info pelanggan, tanggal, dll dari first occurrence
+    df_base_aggregated = df_base.drop_duplicates(subset=['No. Invoice'], keep='first').copy()
 
-    df_merged = pd.merge(df_base, df_paket_final[['No. Invoice', 'Paket', 'Jumlah']], on='No. Invoice', how='left')
+    # Merge dengan paket (bisa multiple rows jika ada berbeda paket)
+    df_merged = pd.merge(df_base_aggregated, df_paket_final, on='No. Invoice', how='left')
     df_merged = pd.merge(df_merged, df_menu_final[['No. Invoice', 'Menu']], on='No. Invoice', how='left')
 
-    df_final = df_merged.drop_duplicates(subset=['No. Invoice'], keep='first').copy()
+    df_final = df_merged.copy()
     df_final['Pemotongan Real'] = ''
 
     final_columns_order = [
@@ -597,11 +684,11 @@ def transform_rekap_kebutuhan(file_sales):
         return None
     
     # Clean up data
-    df_sales.dropna(subset=['Tanggal Kirim', 'No. Invoice'], inplace=True)
+    df_sales.dropna(subset=['Tanggal Potong', 'No. Invoice'], inplace=True)
     df_sales = df_sales[df_sales['Cabang'] != 'Cabang'].copy()
     
     # Parse dates
-    df_sales['Tanggal Kirim'] = pd.to_datetime(df_sales['Tanggal Kirim'], errors='coerce')
+    df_sales['Tanggal Potong'] = pd.to_datetime(df_sales['Tanggal Potong'], errors='coerce')
     
     # Get Paket & Menu from column Q (index 16) and Jumlah from column R (index 17)
     try:
@@ -620,19 +707,19 @@ def transform_rekap_kebutuhan(file_sales):
         st.error(f"Tidak dapat menemukan data paket & menu atau jumlah: {e}")
         return None
     
-    # Groupby Tanggal Kirim and Paket & Menu, aggregating Jumlah
-    df_grouped = df_sales.groupby(["Tanggal Kirim", "Paket & Menu"])['Jumlah'].sum().reset_index()
+    # Groupby Tanggal Potong and Paket & Menu, aggregating Jumlah
+    df_grouped = df_sales.groupby(["Tanggal Potong", "Paket & Menu"])['Jumlah'].sum().reset_index()
     df_grouped['Jumlah'] = df_grouped['Jumlah'].astype(int)
     
     # Format dates to string for pivot table
-    df_grouped['Tanggal Kirim_str'] = df_grouped['Tanggal Kirim'].apply(
+    df_grouped['Tanggal Potong_str'] = df_grouped['Tanggal Potong'].apply(
         lambda x: pd.to_datetime(x).strftime('%d-%m-%Y')
     )
     
     # Create pivot table with ALL data first
     df_pivot = df_grouped.pivot_table(
         index='Paket & Menu',
-        columns='Tanggal Kirim_str',
+        columns='Tanggal Potong_str',
         values='Jumlah',
         aggfunc='sum'
     ).fillna(0).astype(int)
