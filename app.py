@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import io
 import openpyxl 
 import datetime
@@ -480,12 +481,28 @@ def format_rekap_pemotongan_excel(writer, df):
             fmt = cell_format
             col_name = df.columns[col_num]
             
-            # Handle NaT values - convert to empty string untuk tanggal columns
+            # Handle NaT values and convert to proper types for xlsxwriter
             display_value = cell_value
-            if col_name in ['Tanggal Kirim', 'Tanggal Potong'] and pd.isna(cell_value):
-                display_value = ''
             
-            cell_str = str(cell_value).strip() if cell_value is not None else ''
+            # Convert pandas/numpy types to Python native types
+            if pd.isna(cell_value):
+                display_value = ''
+            elif isinstance(cell_value, (pd.Timestamp, datetime.datetime)):
+                display_value = cell_value.to_pydatetime() if hasattr(cell_value, 'to_pydatetime') else cell_value
+            elif isinstance(cell_value, (np.integer, np.floating)):
+                display_value = cell_value.item()
+            elif isinstance(cell_value, np.bool_):
+                display_value = bool(cell_value)
+            elif isinstance(cell_value, (np.ndarray, pd.Series)):
+                display_value = str(cell_value)
+            elif hasattr(cell_value, 'item'):  # other numpy types
+                try:
+                    display_value = cell_value.item()
+                except:
+                    display_value = str(cell_value) if cell_value is not None else ''
+            
+            # Safe string conversion for cell_str
+            cell_str = str(cell_value).strip() if cell_value is not None and not pd.isna(cell_value) else ''
             
             # Jika status "Belum Dikonfirmasi", gunakan format merah untuk seluruh baris
             if is_belum_dikonfirmasi:
