@@ -1061,40 +1061,392 @@ def transform_and_create_word_label(file_input):
 # =============================================================================
 # BAGIAN TAMPILAN APLIKASI WEB (USER INTERFACE)
 # =============================================================================
-st.sidebar.title("Navigasi Menu")
+
+# Set page config untuk layout yang lebih baik
+st.set_page_config(
+    page_title="Riyadh Aqiqah - Management System",
+    page_icon="🐑",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS untuk membuat tampilan lebih modern dan clean
+st.markdown("""
+<style>
+    /* Main background */
+    .main {
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #059669 0%, #047857 100%);
+        padding-top: 2rem;
+    }
+    
+    [data-testid="stSidebar"] .css-1d391kg, [data-testid="stSidebar"] .st-emotion-cache-1d391kg {
+        color: white;
+    }
+    
+    /* Sidebar title */
+    [data-testid="stSidebar"] h1 {
+        color: white !important;
+        font-weight: 700;
+        padding: 1rem 0;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Radio buttons in sidebar */
+    [data-testid="stSidebar"] label {
+        color: white !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+    }
+    
+    [data-testid="stSidebar"] [role="radiogroup"] label {
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        margin: 0.25rem 0;
+    }
+    
+    [data-testid="stSidebar"] [role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Card-like containers */
+    .stAlert, .element-container {
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Main title styling */
+    h1 {
+        color: #065f46;
+        font-weight: 700;
+        padding-bottom: 1rem;
+        border-bottom: 3px solid #10b981;
+        margin-bottom: 2rem;
+    }
+    
+    /* Buttons styling */
+    .stButton > button {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 2rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    }
+    
+    /* Download button special styling */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 2rem;
+        box-shadow: 0 4px 12px rgba(17, 153, 142, 0.3);
+    }
+    
+    .stDownloadButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(17, 153, 142, 0.4);
+    }
+    
+    /* File uploader styling */
+    [data-testid="stFileUploader"] {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 2rem;
+        border-radius: 12px;
+        border: 2px dashed #6ee7b7;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="stFileUploader"]:hover {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: #10b981;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+    
+    /* File uploader label text */
+    [data-testid="stFileUploader"] label {
+        color: #1f2937 !important;
+        font-weight: 600 !important;
+    }
+    
+    [data-testid="stFileUploader"] small {
+        color: #374151 !important;
+    }
+    
+    /* Success/Info/Warning messages */
+    .stSuccess {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        color: #065f46;
+        border-radius: 12px;
+        padding: 1rem;
+        border-left: 4px solid #10b981;
+    }
+    
+    .stInfo {
+        background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+        color: #075985;
+        border-radius: 12px;
+        padding: 1rem;
+        border-left: 4px solid #0284c7;
+    }
+    
+    .stWarning {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #92400e;
+        border-radius: 12px;
+        padding: 1rem;
+        border-left: 4px solid #f59e0b;
+    }
+    
+    /* Dataframe styling */
+    [data-testid="stDataFrame"] {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background: white;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #065f46;
+    }
+    
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: white;
+        border-radius: 8px 8px 0 0;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        border: 2px solid transparent;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white !important;
+    }
+    
+    /* Input fields */
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+        padding: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    
+    /* Selectbox */
+    .stSelectbox > div > div {
+        border-radius: 8px;
+        border: 2px solid #e2e8f0;
+    }
+    
+    /* Divider */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #cbd5e0, transparent);
+    }
+    
+    /* Animation for page load */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .element-container {
+        animation: fadeIn 0.5s ease-out;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Header dengan logo dan deskripsi
+st.markdown("""
+<div style='text-align: center; padding: 2rem 0; background: white; border-radius: 16px; 
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1); margin-bottom: 2rem;'>
+    <img src='https://down-id.img.susercontent.com/file/id-11134004-7r98y-lmmve5folrlzb8' 
+         style='width: 120px; height: 120px; margin-bottom: 1rem; border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);' />
+    <h1 style='color: #065f46; font-size: 2.5rem; margin: 0; border: none;'>
+        Riyadh Aqiqah Management System
+    </h1>
+    <p style='color: #64748b; font-size: 1.1rem; margin-top: 0.5rem;'>
+        Sistem manajemen data pemotongan, kebutuhan mingguan, dan label masak
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# Sidebar with better styling
+st.sidebar.markdown("""
+<div style='text-align: center; padding: 1rem 0; margin-bottom: 1rem;'>
+    <img src='https://down-id.img.susercontent.com/file/id-11134004-7r98y-lmmve5folrlzb8' 
+         style='width: 80px; height: 80px; border-radius: 12px; margin-bottom: 0.5rem;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);' />
+    <p style='color: white; margin: 0.5rem 0 0 0; font-size: 1rem; font-weight: 600;'>
+        Riyadh Aqiqah
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.title("📋 Navigasi Menu")
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
 menu_pilihan = st.sidebar.radio(
     "Pilih menu yang ingin Anda gunakan:",
-    ("Rekap Pemotongan", "Rekap Kebutuhan Mingguan", "Label Masak")
+    ("Rekap Pemotongan", "Rekap Kebutuhan Mingguan", "Label Masak"),
+    label_visibility="collapsed"
 )
+
+# Info footer di sidebar
+st.sidebar.markdown("<br><br>", unsafe_allow_html=True)
+st.sidebar.markdown("""
+<div style='padding: 1rem; margin-top: 2rem;
+            background: rgba(255,255,255,0.1); border-radius: 8px;'>
+    <p style='color: rgba(255,255,255,0.9); font-size: 0.85rem; margin: 0; line-height: 1.5;'>
+        💡 <b>Tips:</b> Pastikan format file sesuai dengan template
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # --- TAMPILAN MENU 1: REKAP PEMOTONGAN ---
 if menu_pilihan == "Rekap Pemotongan":
-    st.title("📝 Rekap Pemotongan")
-    st.write("Unggah file Excel mentah untuk diproses.")
-    uploaded_file_rekap = st.file_uploader("Pilih file Excel atau CSV", type=['xlsx', 'csv'], key="rekap_pemotongan")
+    # Header section
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("📝 Rekap Pemotongan")
+        st.markdown("Upload file Excel atau CSV untuk memproses data pemotongan")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("ℹ️ Panduan"):
+            st.markdown("""
+            **Format file yang didukung:**
+            - Excel (.xlsx)
+            - CSV (.csv)
+            
+            **Cara menggunakan:**
+            1. Pilih file dari komputer
+            2. Tunggu proses transformasi
+            3. Download hasil Excel
+            """)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Upload section dengan container
+    with st.container():
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
+                    padding: 2rem; border-radius: 12px; 
+                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+                    border: 2px solid #a7f3d0;'>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file_rekap = st.file_uploader(
+            "📁 Pilih file Excel atau CSV", 
+            type=['xlsx', 'csv'], 
+            key="rekap_pemotongan",
+            help="Upload file data mentah untuk diproses"
+        )
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
     if uploaded_file_rekap:
-        st.info(f"✔️ File diterima: **{uploaded_file_rekap.name}**. Memproses...")
-        result_df_rekap = transform_rekap_pemotongan(uploaded_file_rekap)
+        # Processing section
+        with st.spinner('🔄 Memproses file... Mohon tunggu sebentar'):
+            st.info(f"✅ File diterima: **{uploaded_file_rekap.name}**")
+            result_df_rekap = transform_rekap_pemotongan(uploaded_file_rekap)
+        
         if result_df_rekap is not None:
+            # Success message
             st.success("🎉 Transformasi data berhasil!")
-            st.dataframe(result_df_rekap)
+            
+            # Metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 Total Baris", len(result_df_rekap))
+            with col2:
+                st.metric("📋 Total Kolom", len(result_df_rekap.columns))
+            with col3:
+                st.metric("📁 Nama File", uploaded_file_rekap.name[:20] + "...")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Preview data dengan styling
+            st.subheader("👁️ Preview Data")
+            st.dataframe(
+                result_df_rekap, 
+                use_container_width=True,
+                height=400
+            )
+            
+            # Generate Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # JANGAN gunakan to_excel dengan header=True karena akan overwrite format
-                # Tulis data tanpa header terlebih dahulu
                 result_df_rekap.to_excel(writer, index=False, sheet_name='Hasil Rekap Pemotongan', 
                                         startrow=1, startcol=0, header=False)
-                # Sekarang format function akan menulis header di row 0 dengan font size 22
                 format_rekap_pemotongan_excel(writer, result_df_rekap)
             excel_data = output.getvalue()
             now = datetime.datetime.now()
             download_filename = now.strftime("%d_%m_%Y-%H_%M") + "-Rekap_Pemotongan.xlsx"
-            st.download_button(label="⬇️ Download Hasil sebagai Excel", data=excel_data, file_name=download_filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            # Download section
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.download_button(
+                    label="⬇️ Download Hasil sebagai Excel",
+                    data=excel_data,
+                    file_name=download_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
 
 # --- TAMPILAN MENU 2: REKAP KEBUTUHAN MINGGUAN ---
 elif menu_pilihan == "Rekap Kebutuhan Mingguan":
-    st.title("📊 Rekap Kebutuhan Mingguan")
-    st.write("Unggah **File Status Penjualan** untuk diproses.")
+    # Header section
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("📊 Rekap Kebutuhan Mingguan")
+        st.markdown("Upload **File Status Penjualan** untuk membuat rekap kebutuhan mingguan")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("ℹ️ Panduan"):
+            st.markdown("""
+            **File yang dibutuhkan:**
+            - File Excel Status Penjualan
+            
+            **Fitur:**
+            - Kelola kategori paket & menu
+            - Transformasi otomatis
+            - Export ke Excel
+            """)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # ===== KATEGORI MANAGEMENT (EXPANDER) =====
     with st.expander("⚙️ Kelola Kategori Paket & Menu", expanded=False):
@@ -1202,14 +1554,56 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
     st.divider()
     
     # ===== MAIN PROCESSING =====
-    uploaded_file_sales = st.file_uploader("Pilih File Excel Penjualan", type=['xlsx'], key="status_penjualan")
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Upload section dengan container
+    with st.container():
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
+                    padding: 2rem; border-radius: 12px; 
+                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+                    border: 2px solid #a7f3d0;'>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file_sales = st.file_uploader(
+            "📁 Pilih File Excel Status Penjualan",
+            type=['xlsx'],
+            key="status_penjualan",
+            help="Upload file Excel dengan data status penjualan"
+        )
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
     if uploaded_file_sales:
-        st.info(f"✔️ File '{uploaded_file_sales.name}' diterima. Memproses...")
-        result_df_kebutuhan = transform_rekap_kebutuhan(uploaded_file_sales)
+        # Processing section
+        with st.spinner('🔄 Memproses data penjualan... Mohon tunggu sebentar'):
+            st.info(f"✅ File diterima: **{uploaded_file_sales.name}**")
+            result_df_kebutuhan = transform_rekap_kebutuhan(uploaded_file_sales)
+        
         if result_df_kebutuhan is not None:
+            # Success message
             st.success("🎉 Transformasi data berhasil!")
-            st.dataframe(result_df_kebutuhan)
             
+            # Metrics
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📊 Total Item", len(result_df_kebutuhan))
+            with col2:
+                st.metric("📋 Total Periode", len(result_df_kebutuhan.columns) - 1)
+            with col3:
+                st.metric("📁 File", uploaded_file_sales.name[:20] + "...")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Preview data
+            st.subheader("👁️ Preview Rekap Kebutuhan")
+            st.dataframe(
+                result_df_kebutuhan,
+                use_container_width=True,
+                height=400
+            )
+            
+            # Generate Excel
             output_kebutuhan = io.BytesIO()
             with pd.ExcelWriter(output_kebutuhan, engine='xlsxwriter') as writer:
                 result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Rekap Kebutuhan', startrow=1, header=False)
@@ -1223,23 +1617,96 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
             excel_data_kebutuhan = output_kebutuhan.getvalue()
             now = datetime.datetime.now()
             download_filename_kebutuhan = now.strftime("%d_%m_%Y-%H_%M") + "-Rekap_Kebutuhan_Mingguan.xlsx"
-            st.download_button(label="⬇️ Download Rekap Kebutuhan Mingguan", data=excel_data_kebutuhan, file_name=download_filename_kebutuhan, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            
+            # Download section
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.download_button(
+                    label="⬇️ Download Rekap Kebutuhan Mingguan",
+                    data=excel_data_kebutuhan,
+                    file_name=download_filename_kebutuhan,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
 
 # --- TAMPILAN MENU 3: LABEL MASAK ---
 elif menu_pilihan == "Label Masak":
-    st.title("🏷️ Label Masak")
-    st.write("Unggah file template Excel untuk membuat label masak dalam format Microsoft Word.")
-    uploaded_file_label = st.file_uploader("Pilih File Template Excel", type=['xlsx'], key="label_masak")
+    # Header section
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("🏷️ Label Masak")
+        st.markdown("Upload file template Excel untuk membuat label masak dalam format Microsoft Word")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("ℹ️ Panduan"):
+            st.markdown("""
+            **File yang dibutuhkan:**
+            - Template Excel dengan data label
+            
+            **Output:**
+            - Dokumen Word (.docx)
+            - Format siap cetak
+            - Layout otomatis
+            """)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Upload section dengan container
+    with st.container():
+        st.markdown("""
+        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
+                    padding: 2rem; border-radius: 12px; 
+                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+                    border: 2px solid #a7f3d0;'>
+        """, unsafe_allow_html=True)
+        
+        uploaded_file_label = st.file_uploader(
+            "📁 Pilih File Template Excel",
+            type=['xlsx'],
+            key="label_masak",
+            help="Upload template Excel untuk membuat label masak"
+        )
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+    
     if uploaded_file_label is not None:
-        with st.spinner(f"⏳ Memproses file '{uploaded_file_label.name}'..."):
+        # Processing with better visual feedback
+        with st.spinner('🔄 Membuat dokumen Word... Mohon tunggu sebentar'):
+            progress_bar = st.progress(0)
+            progress_bar.progress(30)
             word_file_buffer = transform_and_create_word_label(uploaded_file_label)
+            progress_bar.progress(100)
+        
         if word_file_buffer is not None:
+            # Success message
             st.success("✅ Dokumen Word berhasil dibuat!")
+            
+            # Info card
+            st.info(f"📄 File template: **{uploaded_file_label.name}** berhasil diproses")
+            
+            # Generate filename
             now = datetime.datetime.now()
             download_filename_word = now.strftime("%d_%m_%Y-%H_%M") + "-Label_Masak.docx"
-            st.download_button(
-                label="⬇️ Download Label Masak sebagai Word",
-                data=word_file_buffer,
-                file_name=download_filename_word,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
+            
+            # Download section
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.download_button(
+                    label="⬇️ Download Label Masak sebagai Word",
+                    data=word_file_buffer,
+                    file_name=download_filename_word,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
+            
+            # Additional info
+            st.markdown("<br>", unsafe_allow_html=True)
+            with st.expander("📝 Informasi Dokumen"):
+                st.markdown(f"""
+                - **Nama File**: {download_filename_word}
+                - **Format**: Microsoft Word (.docx)
+                - **Dibuat**: {now.strftime("%d %B %Y, %H:%M")}
+                - **Status**: Siap untuk dicetak
+                """)
