@@ -392,10 +392,10 @@ def format_rekap_pemotongan_excel(writer, df):
         'border': 1
     })
     
-    # Format untuk baris dengan Status "Belum Dikonfirmasi" (red background)
+    # Format untuk baris dengan Status "Belum Dikonfirmasi" (red background with BLACK text)
     belum_dikonfirmasi_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#FFFFFF',  # White text
+        'font_color': '#000000',  # Black text (changed from white)
         'bg_color': '#FF0000',  # Red background
         'bold': True,
         'valign': 'vcenter',
@@ -406,7 +406,7 @@ def format_rekap_pemotongan_excel(writer, df):
     
     belum_dikonfirmasi_center_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#FFFFFF',  # White text
+        'font_color': '#000000',  # Black text (changed from white)
         'bg_color': '#FF0000',  # Red background
         'bold': True,
         'valign': 'vcenter',
@@ -417,7 +417,7 @@ def format_rekap_pemotongan_excel(writer, df):
     
     belum_dikonfirmasi_date_format = workbook.add_format({
         'font_size': 22,
-        'font_color': '#FFFFFF',  # White text
+        'font_color': '#000000',  # Black text (changed from white)
         'bg_color': '#FF0000',  # Red background
         'bold': True,
         'valign': 'vcenter',
@@ -504,22 +504,25 @@ def format_rekap_pemotongan_excel(writer, df):
             # Safe string conversion for cell_str
             cell_str = str(cell_value).strip() if cell_value is not None and not pd.isna(cell_value) else ''
             
-            # Jika status "Belum Dikonfirmasi", gunakan format merah untuk seluruh baris
+            # LOGIKA BARU: Jika "Belum Dikonfirmasi", set default ke format merah dengan font hitam
+            # Tapi jika ada formatting khusus di kolom tertentu, formatting khusus menimpa background merah
             if is_belum_dikonfirmasi:
+                # Default untuk baris "Belum Dikonfirmasi" adalah background merah dengan font hitam
                 if col_name in ['Tanggal Kirim', 'Tanggal Potong']:
                     fmt = belum_dikonfirmasi_date_format
                 elif col_name in ['Nomor', 'Jumlah', 'Jenis Kelamin Anak']:
                     fmt = belum_dikonfirmasi_center_format
                 else:
                     fmt = belum_dikonfirmasi_format
-                # Skip conditional formatting lainnya, langsung write
-                worksheet.write(row_num, col_num, display_value, fmt)
-                continue
+                
+                # Sekarang cek apakah ada formatting khusus yang harus menimpa background merah
+                # Formatting khusus akan diterapkan di bawah, jadi kita perlu lanjut ke pengecekan
+            
+            # === SEKARANG CEK FORMATTING KHUSUS - ini akan menimpa format merah jika ada ===
             
             # === KOLOM C & D: Cek jika Tanggal Kirim = Tanggal Potong ===
             if col_name == 'Tanggal Kirim':
                 # Bandingkan dengan Tanggal Potong (kolom D)
-                # Konversi datetime ke date string untuk perbandingan
                 tanggal_potong_val = row_data[3]
                 tanggal_kirim_val = cell_value
                 
@@ -529,13 +532,16 @@ def format_rekap_pemotongan_excel(writer, df):
                         tanggal_kirim_str = pd.to_datetime(tanggal_kirim_val).strftime('%Y-%m-%d')
                         tanggal_potong_str = pd.to_datetime(tanggal_potong_val).strftime('%Y-%m-%d')
                         if tanggal_kirim_str == tanggal_potong_str:
+                            # Formatting khusus: tanggal sama menimpa format merah
                             fmt = date_same_format
-                        else:
+                        elif not is_belum_dikonfirmasi:
+                            # Hanya set date_format jika bukan "Belum Dikonfirmasi"
                             fmt = date_format
-                    else:
+                    elif not is_belum_dikonfirmasi:
                         fmt = cell_center_format
                 except:
-                    fmt = cell_center_format
+                    if not is_belum_dikonfirmasi:
+                        fmt = cell_center_format
             
             elif col_name == 'Tanggal Potong':
                 # Bandingkan dengan Tanggal Kirim (kolom C)
@@ -548,43 +554,52 @@ def format_rekap_pemotongan_excel(writer, df):
                         tanggal_kirim_str = pd.to_datetime(tanggal_kirim_val).strftime('%Y-%m-%d')
                         tanggal_potong_str = pd.to_datetime(tanggal_potong_val).strftime('%Y-%m-%d')
                         if tanggal_kirim_str == tanggal_potong_str:
+                            # Formatting khusus: tanggal sama menimpa format merah
                             fmt = date_same_format
-                        else:
+                        elif not is_belum_dikonfirmasi:
+                            # Hanya set date_format jika bukan "Belum Dikonfirmasi"
                             fmt = date_format
-                    else:
+                    elif not is_belum_dikonfirmasi:
                         fmt = cell_center_format
                 except:
-                    fmt = cell_center_format
+                    if not is_belum_dikonfirmasi:
+                        fmt = cell_center_format
             
             # === KOLOM M: Paket - Cek Jantan atau Kebuli ===
             elif col_name == 'Paket':
                 if 'jantan' in cell_str.lower():
+                    # Formatting khusus: paket jantan menimpa format merah
                     fmt = paket_jantan_format
                 elif 'kebuli' in cell_str.lower():
+                    # Formatting khusus: paket kebuli menimpa format merah
                     fmt = paket_kebuli_format
-                else:
+                elif not is_belum_dikonfirmasi:
                     fmt = cell_format
             
             # === KOLOM P: Pemotongan Disaksikan - Cek Live Video Call atau Disaksikan ===
             elif col_name == 'Pemotongan Disaksikan':
                 if 'live video call' in cell_str.lower():
+                    # Formatting khusus: live video call menimpa format merah
                     fmt = pemotongan_live_format
                 elif 'disaksikan' in cell_str.lower():
+                    # Formatting khusus: disaksikan menimpa format merah
                     fmt = pemotongan_disaksikan_format
-                else:
+                elif not is_belum_dikonfirmasi:
                     fmt = cell_format
             
             # === KOLOM Q: Catatan Khusus - Cek Domba, Kambing, Upgrade Bobot, atau Bukan Aqiqah ===
             elif col_name == 'Catatan Khusus':
                 keywords = ['domba', 'kambing', 'upgrade bobot', 'bukan aqiqah']
                 if any(keyword in cell_str.lower() for keyword in keywords):
+                    # Formatting khusus: catatan khusus menimpa format merah
                     fmt = catatan_yellow_format
-                else:
+                elif not is_belum_dikonfirmasi:
                     fmt = cell_format
             
             # === KOLOM Nomor, Jumlah, Jenis Kelamin Anak - Center Aligned ===
             elif col_name in ['Nomor', 'Jumlah', 'Jenis Kelamin Anak']:
-                fmt = cell_center_format
+                if not is_belum_dikonfirmasi:
+                    fmt = cell_center_format
             
             # === Apply date num_format to date columns ===
             if col_name in ['Tanggal Kirim', 'Tanggal Potong'] and fmt == date_format:
@@ -658,6 +673,11 @@ def transform_rekap_pemotongan(uploaded_file):
     if "Pemotongan DisaksikanNama" in df.columns:
         df.rename(columns={"Pemotongan DisaksikanNama": "Pemotongan Disaksikan"}, inplace=True)
     
+    # Cek berbagai variasi nama kolom untuk Pemotongan Disaksikan
+    possible_names = [col for col in df.columns if 'pemotongan' in col.lower() and 'disaksikan' in col.lower()]
+    if possible_names and 'Pemotongan Disaksikan' not in df.columns:
+        df.rename(columns={possible_names[0]: 'Pemotongan Disaksikan'}, inplace=True)
+    
     # Parse tanggal - coba format DD/MM/YYYY dulu, jika gagal coba format lain
     def parse_tanggal(val):
         if pd.isna(val):
@@ -716,17 +736,45 @@ def transform_rekap_pemotongan(uploaded_file):
             return [s for s in statuses if 'belum dikonfirmasi' in str(s).lower()][0]
         return statuses.iloc[0]
     
-    # Aggregate data lain berdasarkan No. Invoice
-    agg_dict = {}
-    for col in df_base.columns:
-        if col == 'No. Invoice':
-            continue
-        elif col == 'Status Perkembangan':
-            agg_dict[col] = aggregate_status
-        else:
-            agg_dict[col] = 'first'
+    # Untuk agregasi yang benar, kita perlu akses ke kolom 'Paket & Menu' (kolom Q)
+    # Jadi kita tidak drop 'Paket & Menu' dari df_base, kita simpan untuk referensi
+    # Buat df yang include 'Paket & Menu' untuk agregasi custom
+    df_with_paket = df.copy()
     
-    df_base_aggregated = df_base.groupby('No. Invoice', as_index=False).agg(agg_dict)
+    # Custom aggregation untuk kolom yang perlu mengikuti baris dengan "Paket" di kolom Q
+    def aggregate_by_paket(group_df, col_name):
+        # Cari baris yang di kolom 'Paket & Menu' mengandung kata "Paket"
+        paket_rows = group_df[group_df['Paket & Menu'].astype(str).str.contains("Paket", case=False, na=False)]
+        
+        if len(paket_rows) > 0:
+            # Ambil nilai dari baris yang ada "Paket" (ambil yang pertama jika ada multiple)
+            return paket_rows.iloc[0][col_name]
+        else:
+            # Jika tidak ada baris dengan "Paket", ambil nilai pertama
+            return group_df.iloc[0][col_name]
+    
+    # Aggregate data berdasarkan No. Invoice dengan logika khusus
+    grouped = df_with_paket.groupby('No. Invoice')
+    
+    result_rows = []
+    for invoice, group in grouped:
+        result_row = {'No. Invoice': invoice}
+        
+        for col in df_base.columns:
+            if col == 'No. Invoice':
+                continue
+            elif col == 'Status Perkembangan':
+                result_row[col] = aggregate_status(group[col])
+            elif col == 'Pemotongan Disaksikan':
+                # Gunakan agregasi berdasarkan baris yang punya "Paket"
+                result_row[col] = aggregate_by_paket(group, col)
+            else:
+                # Untuk kolom lainnya, juga ikuti baris dengan "Paket" jika ada
+                result_row[col] = aggregate_by_paket(group, col)
+        
+        result_rows.append(result_row)
+    
+    df_base_aggregated = pd.DataFrame(result_rows)
 
     # Merge dengan paket (bisa multiple rows jika ada berbeda paket)
     df_merged = pd.merge(df_base_aggregated, df_paket_final, on='No. Invoice', how='left')
@@ -852,7 +900,7 @@ def transform_rekap_kebutuhan(file_sales):
     for date_str in date_cols_filtered:
         date_obj = pd.to_datetime(date_str, format='%d-%m-%Y')
         weekday_name = hari_id[date_obj.weekday()]
-        new_col_name = f"{weekday_name}: {date_str}"
+        new_col_name = f"{weekday_name}\n{date_str}"
         date_cols_renamed[date_str] = new_col_name
     
     df_pivot.rename(columns=date_cols_renamed, inplace=True)
@@ -1090,6 +1138,11 @@ st.set_page_config(
 # Custom CSS untuk membuat tampilan lebih modern dan clean
 st.markdown("""
 <style>
+    /* Root background - area di luar konten utama */
+    .stApp {
+        background: linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%);
+    }
+    
     /* Main background */
     .main {
         background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
@@ -1374,23 +1427,13 @@ if menu_pilihan == "Rekap Pemotongan":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Upload section dengan container
-    with st.container():
-        st.markdown("""
-        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
-                    padding: 2rem; border-radius: 12px; 
-                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
-                    border: 2px solid #a7f3d0;'>
-        """, unsafe_allow_html=True)
-        
-        uploaded_file_rekap = st.file_uploader(
-            "📁 Pilih file Excel atau CSV", 
-            type=['xlsx', 'csv'], 
-            key="rekap_pemotongan",
-            help="Upload file data mentah untuk diproses"
-        )
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Upload section
+    uploaded_file_rekap = st.file_uploader(
+        "📁 Pilih file Excel atau CSV", 
+        type=['xlsx', 'csv'], 
+        key="rekap_pemotongan",
+        help="Upload file data mentah untuk diproses"
+    )
     
     if uploaded_file_rekap:
         # Processing section
@@ -1414,7 +1457,7 @@ if menu_pilihan == "Rekap Pemotongan":
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Preview data dengan styling
-            st.subheader("👁️ Preview Data")
+            st.subheader("🕶️ Preview Data")
             st.dataframe(
                 result_df_rekap, 
                 use_container_width=True,
@@ -1573,23 +1616,13 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
     # ===== MAIN PROCESSING =====
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Upload section dengan container
-    with st.container():
-        st.markdown("""
-        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
-                    padding: 2rem; border-radius: 12px; 
-                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
-                    border: 2px solid #a7f3d0;'>
-        """, unsafe_allow_html=True)
-        
-        uploaded_file_sales = st.file_uploader(
-            "📁 Pilih File Excel Status Penjualan",
-            type=['xlsx'],
-            key="status_penjualan",
-            help="Upload file Excel dengan data status penjualan"
-        )
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Upload section
+    uploaded_file_sales = st.file_uploader(
+        "📁 Pilih File Excel Status Penjualan",
+        type=['xlsx'],
+        key="status_penjualan",
+        help="Upload file Excel dengan data status penjualan"
+    )
     
     if uploaded_file_sales:
         # Processing section
@@ -1613,7 +1646,7 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Preview data
-            st.subheader("👁️ Preview Rekap Kebutuhan")
+            st.subheader("🕶️ Preview Rekap Kebutuhan")
             st.dataframe(
                 result_df_kebutuhan,
                 use_container_width=True,
@@ -1626,9 +1659,18 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
                 result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Rekap Kebutuhan', startrow=1, header=False)
                 workbook = writer.book
                 worksheet = writer.sheets['Rekap Kebutuhan']
-                header_format = workbook.add_format({'bold': True, 'text_wrap': True, 'valign': 'top', 'fg_color': '#D7E4BC', 'border': 1})
+                header_format = workbook.add_format({
+                    'bold': True, 
+                    'text_wrap': True, 
+                    'valign': 'vcenter', 
+                    'align': 'center',
+                    'fg_color': '#D7E4BC', 
+                    'border': 1
+                })
                 for col_num, value in enumerate(result_df_kebutuhan.columns.values):
                     worksheet.write(0, col_num, value, header_format)
+                # Set row height untuk header agar cukup untuk 2 baris teks
+                worksheet.set_row(0, 30)
                 worksheet.set_column(0, 0, 40)
                 worksheet.set_column(1, len(result_df_kebutuhan.columns)-1, 15)
             excel_data_kebutuhan = output_kebutuhan.getvalue()
@@ -1669,23 +1711,13 @@ elif menu_pilihan == "Label Masak":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Upload section dengan container
-    with st.container():
-        st.markdown("""
-        <div style='background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
-                    padding: 2rem; border-radius: 12px; 
-                    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
-                    border: 2px solid #a7f3d0;'>
-        """, unsafe_allow_html=True)
-        
-        uploaded_file_label = st.file_uploader(
-            "📁 Pilih File Template Excel",
-            type=['xlsx'],
-            key="label_masak",
-            help="Upload template Excel untuk membuat label masak"
-        )
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Upload section
+    uploaded_file_label = st.file_uploader(
+        "📁 Pilih File Template Excel",
+        type=['xlsx'],
+        key="label_masak",
+        help="Upload template Excel untuk membuat label masak"
+    )
     
     if uploaded_file_label is not None:
         # Processing with better visual feedback
