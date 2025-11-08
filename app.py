@@ -391,6 +391,41 @@ def format_rekap_pemotongan_excel(writer, df):
         'border': 1
     })
     
+    # Format untuk baris dengan Status "Belum Dikonfirmasi" (red background)
+    belum_dikonfirmasi_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#FFFFFF',  # White text
+        'bg_color': '#FF0000',  # Red background
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'left',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    belum_dikonfirmasi_center_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#FFFFFF',  # White text
+        'bg_color': '#FF0000',  # Red background
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1
+    })
+    
+    belum_dikonfirmasi_date_format = workbook.add_format({
+        'font_size': 22,
+        'font_color': '#FFFFFF',  # White text
+        'bg_color': '#FF0000',  # Red background
+        'bold': True,
+        'valign': 'vcenter',
+        'align': 'center',
+        'text_wrap': True,
+        'border': 1,
+        'num_format': 'dd/mm/yyyy'
+    })
+    
     # Set page layout
     worksheet.set_margins(left=0.28, right=0.28, top=0.75, bottom=0.75)
     worksheet.set_landscape()
@@ -434,12 +469,16 @@ def format_rekap_pemotongan_excel(writer, df):
     for row_num in range(1, len(df) + 1):
         worksheet.set_row(row_num, None)  # Auto height untuk data rows
         
+        # Cek status perkembangan untuk baris ini
+        row_data = df.iloc[row_num - 1]
+        status_perkembangan = str(row_data['Status Perkembangan']).strip() if 'Status Perkembangan' in df.columns else ''
+        is_belum_dikonfirmasi = 'belum dikonfirmasi' in status_perkembangan.lower()
+        
         # Format setiap cell di row ini
         for col_num, cell_value in enumerate(df.iloc[row_num - 1].values):
             # Default format
             fmt = cell_format
             col_name = df.columns[col_num]
-            row_data = df.iloc[row_num - 1]  # Get row data untuk comparisons
             
             # Handle NaT values - convert to empty string untuk tanggal columns
             display_value = cell_value
@@ -447,6 +486,18 @@ def format_rekap_pemotongan_excel(writer, df):
                 display_value = ''
             
             cell_str = str(cell_value).strip() if cell_value is not None else ''
+            
+            # Jika status "Belum Dikonfirmasi", gunakan format merah untuk seluruh baris
+            if is_belum_dikonfirmasi:
+                if col_name in ['Tanggal Kirim', 'Tanggal Potong']:
+                    fmt = belum_dikonfirmasi_date_format
+                elif col_name in ['Nomor', 'Jumlah', 'Jenis Kelamin Anak']:
+                    fmt = belum_dikonfirmasi_center_format
+                else:
+                    fmt = belum_dikonfirmasi_format
+                # Skip conditional formatting lainnya, langsung write
+                worksheet.write(row_num, col_num, display_value, fmt)
+                continue
             
             # === KOLOM C & D: Cek jika Tanggal Kirim = Tanggal Potong ===
             if col_name == 'Tanggal Kirim':
@@ -641,9 +692,24 @@ def transform_rekap_pemotongan(uploaded_file):
                     'Tanggal Domba Dipotong', 'Jam Tiba (hh:mm)', 'Jam Kirim (hh:mm)', 'Kode Menu']
     df_base = df.drop(columns=cols_to_drop + ['Jumlah'], errors='ignore')
     
-    # Aggregate data lain berdasarkan No. Invoice (ambil first row untuk setiap Invoice)
-    # Ini untuk mendapatkan semua info pelanggan, tanggal, dll dari first occurrence
-    df_base_aggregated = df_base.drop_duplicates(subset=['No. Invoice'], keep='first').copy()
+    # Custom aggregation untuk Status Perkembangan
+    # Prioritas: ambil "Belum Dikonfirmasi" jika ada, jika tidak ambil yang pertama
+    def aggregate_status(statuses):
+        if any('belum dikonfirmasi' in str(s).lower() for s in statuses):
+            return [s for s in statuses if 'belum dikonfirmasi' in str(s).lower()][0]
+        return statuses.iloc[0]
+    
+    # Aggregate data lain berdasarkan No. Invoice
+    agg_dict = {}
+    for col in df_base.columns:
+        if col == 'No. Invoice':
+            continue
+        elif col == 'Status Perkembangan':
+            agg_dict[col] = aggregate_status
+        else:
+            agg_dict[col] = 'first'
+    
+    df_base_aggregated = df_base.groupby('No. Invoice', as_index=False).agg(agg_dict)
 
     # Merge dengan paket (bisa multiple rows jika ada berbeda paket)
     df_merged = pd.merge(df_base_aggregated, df_paket_final, on='No. Invoice', how='left')
@@ -687,8 +753,22 @@ def transform_rekap_kebutuhan(file_sales):
     df_sales.dropna(subset=['Tanggal Potong', 'No. Invoice'], inplace=True)
     df_sales = df_sales[df_sales['Cabang'] != 'Cabang'].copy()
     
-    # Parse dates
-    df_sales['Tanggal Potong'] = pd.to_datetime(df_sales['Tanggal Potong'], errors='coerce')
+    # Parse dates dengan format DD/MM/YYYY
+    def parse_tanggal_kebutuhan(val):
+        if pd.isna(val):
+            return None
+        try:
+            # Coba format DD/MM/YYYY (asumsi input user)
+            return pd.to_datetime(str(val).strip(), format='%d/%m/%Y')
+        except:
+            try:
+                # Coba format lain (auto-detect)
+                result = pd.to_datetime(str(val).strip(), errors='coerce')
+                return result
+            except:
+                return None
+    
+    df_sales['Tanggal Potong'] = df_sales['Tanggal Potong'].apply(parse_tanggal_kebutuhan)
     
     # Get Paket & Menu from column Q (index 16) and Jumlah from column R (index 17)
     try:
@@ -741,27 +821,44 @@ def transform_rekap_kebutuhan(file_sales):
     date_cols = [c for c in df_pivot.columns if c != 'Paket & Menu']
     date_cols_sorted = sorted(date_cols, key=lambda x: pd.to_datetime(x, format='%d-%m-%Y'))
     
+    # Filter hanya 7 hari: hari ini + 6 hari berikutnya
+    today = pd.Timestamp.now().normalize()
+    target_dates = [today + pd.Timedelta(days=i) for i in range(7)]
+    target_dates_str = [d.strftime('%d-%m-%Y') for d in target_dates]
+    
+    # Ambil hanya kolom tanggal yang ada dalam 7 hari target
+    date_cols_filtered = [d for d in date_cols_sorted if d in target_dates_str]
+    
     # Add weekday names to date columns
     hari_id = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
     date_cols_renamed = {}
-    for date_str in date_cols_sorted:
+    for date_str in date_cols_filtered:
         date_obj = pd.to_datetime(date_str, format='%d-%m-%Y')
         weekday_name = hari_id[date_obj.weekday()]
         new_col_name = f"{weekday_name}: {date_str}"
         date_cols_renamed[date_str] = new_col_name
     
     df_pivot.rename(columns=date_cols_renamed, inplace=True)
-    date_cols_sorted_renamed = [date_cols_renamed[c] for c in date_cols_sorted]
+    date_cols_sorted_renamed = [date_cols_renamed[c] for c in date_cols_filtered]
     
-    # Reorder columns
+    # Reorder columns - hanya ambil kolom yang ada dalam 7 hari
     final_col_order = ['Paket & Menu'] + date_cols_sorted_renamed
     df_final = df_pivot[final_col_order].copy()
+    
+    # Add kolom Total untuk setiap baris (jumlah dari semua tanggal)
+    if len(date_cols_sorted_renamed) > 0:
+        df_final['Total'] = df_final[date_cols_sorted_renamed].sum(axis=1).astype(int)
+    
+    # Filter: hapus baris yang Total = 0
+    df_final = df_final[df_final['Total'] > 0].copy()
     
     # Add TOTAL row at the bottom
     if len(date_cols_sorted_renamed) > 0:
         totals_row = {'Paket & Menu': 'TOTAL'}
         for col in date_cols_sorted_renamed:
             totals_row[col] = int(df_final[col].sum())
+        # Total dari kolom Total
+        totals_row['Total'] = int(df_final['Total'].sum())
         df_final = pd.concat([df_final, pd.DataFrame([totals_row])], ignore_index=True)
     
     return df_final
@@ -780,8 +877,24 @@ def transform_and_create_word_label(file_input):
         df.dropna(subset=['No. Invoice'], inplace=True)
         df = df[df['Cabang'] != 'Cabang'].copy()
 
+        # Parse tanggal dengan format DD/MM/YYYY
+        def parse_tanggal_label(val):
+            if pd.isna(val):
+                return None
+            try:
+                # Coba format DD/MM/YYYY (asumsi input user)
+                return pd.to_datetime(str(val).strip(), format='%d/%m/%Y')
+            except:
+                try:
+                    # Coba format lain (auto-detect)
+                    result = pd.to_datetime(str(val).strip(), errors='coerce')
+                    return result
+                except:
+                    return None
+        
         for col in ['Tanggal Kirim', 'Tanggal Potong']:
-            df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%d/%m/%Y')
+            df[col] = df[col].apply(parse_tanggal_label)
+            df[col] = df[col].dt.strftime('%d/%m/%Y')
         
         def format_time(time_val):
             if isinstance(time_val, datetime.time):
@@ -796,7 +909,7 @@ def transform_and_create_word_label(file_input):
         df.fillna('', inplace=True)
         
         df['Detail Customer'] = (
-            "Nama Aqiqah: " + df['Nama Anak'].astype(str).str.strip() + "\n" +
+            "Nama Aqiqah:\n" + df['Nama Anak'].astype(str).str.strip() + "\n" +
             "No. Invoice: " + df['No. Invoice'].astype(str).str.strip() + "\n" +
             "Jenis Kelamin: " + df['Jenis Kelamin Anak'].astype(str).str.strip() + "\n" +
             "Cabang: " + df['Cabang'].astype(str).str.strip()
@@ -844,13 +957,14 @@ def transform_and_create_word_label(file_input):
                         p = cell_col1.add_paragraph()
                     
                     if line.startswith('Nama Aqiqah:'):
-                        # Bold untuk "Nama Aqiqah: [value]"
-                        run_label = p.add_run('Nama Aqiqah: ')
+                        # Bold untuk "Nama Aqiqah:" saja (nama ada di baris berikutnya)
+                        run_label = p.add_run(line)
                         run_label.font.bold = True
                         run_label.font.name = 'Arial'
                         run_label.font.size = Pt(10)
-                        
-                        run_value = p.add_run(line.replace('Nama Aqiqah: ', ''))
+                    elif line and not line.startswith('No. Invoice:') and not line.startswith('Jenis Kelamin:') and not line.startswith('Cabang:'):
+                        # Ini adalah nama anak (baris setelah "Nama Aqiqah:")
+                        run_value = p.add_run(line)
                         run_value.font.bold = True
                         run_value.font.name = 'Arial'
                         run_value.font.size = Pt(10)
