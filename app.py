@@ -882,17 +882,26 @@ def transform_rekap_kebutuhan(file_sales):
     # Use only items in kategori for main output
     df_pivot = df_in_kategori.copy()
     
-    # Sort date columns
+    # Sort date columns yang ada di data
     date_cols = [c for c in df_pivot.columns if c != 'Paket & Menu']
     date_cols_sorted = sorted(date_cols, key=lambda x: pd.to_datetime(x, format='%d-%m-%Y'))
     
-    # Filter hanya 7 hari: hari ini + 6 hari berikutnya
+    # Cari 7 tanggal yang ADA datanya, dimulai dari hari ini atau setelahnya
     today = pd.Timestamp.now().normalize()
-    target_dates = [today + pd.Timedelta(days=i) for i in range(7)]
-    target_dates_str = [d.strftime('%d-%m-%Y') for d in target_dates]
     
-    # Ambil hanya kolom tanggal yang ada dalam 7 hari target
-    date_cols_filtered = [d for d in date_cols_sorted if d in target_dates_str]
+    # Filter hanya tanggal >= hari ini
+    date_cols_from_today = [d for d in date_cols_sorted if pd.to_datetime(d, format='%d-%m-%Y') >= today]
+    
+    # Ambil maksimal 7 tanggal pertama yang ada datanya
+    date_cols_filtered = date_cols_from_today[:7]
+    
+    # Jika kurang dari 7, cek apakah ada tanggal sebelum hari ini yang bisa digunakan
+    if len(date_cols_filtered) < 7:
+        # Ambil tanggal sebelum hari ini juga jika perlu
+        date_cols_before_today = [d for d in date_cols_sorted if pd.to_datetime(d, format='%d-%m-%Y') < today]
+        # Tambahkan dari tanggal sebelumnya (terbaru dulu)
+        remaining_needed = 7 - len(date_cols_filtered)
+        date_cols_filtered = date_cols_before_today[-remaining_needed:] + date_cols_filtered if len(date_cols_before_today) > 0 else date_cols_filtered
     
     # Add weekday names to date columns
     hari_id = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -906,7 +915,7 @@ def transform_rekap_kebutuhan(file_sales):
     df_pivot.rename(columns=date_cols_renamed, inplace=True)
     date_cols_sorted_renamed = [date_cols_renamed[c] for c in date_cols_filtered]
     
-    # Reorder columns - hanya ambil kolom yang ada dalam 7 hari
+    # Reorder columns - ambil kolom tanggal yang sudah difilter
     final_col_order = ['Paket & Menu'] + date_cols_sorted_renamed
     df_final = df_pivot[final_col_order].copy()
     
@@ -919,7 +928,7 @@ def transform_rekap_kebutuhan(file_sales):
     
     # Add TOTAL row at the bottom
     if len(date_cols_sorted_renamed) > 0:
-        totals_row = {'Paket & Menu': 'TOTAL'}
+        totals_row = {'Paket & Menu': 'SUB TOTAL'}
         for col in date_cols_sorted_renamed:
             totals_row[col] = int(df_final[col].sum())
         # Total dari kolom Total
