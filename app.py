@@ -1668,6 +1668,8 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
                 result_df_kebutuhan.to_excel(writer, index=False, sheet_name='Rekap Kebutuhan', startrow=1, header=False)
                 workbook = writer.book
                 worksheet = writer.sheets['Rekap Kebutuhan']
+                
+                # Format untuk header
                 header_format = workbook.add_format({
                     'bold': True, 
                     'text_wrap': True, 
@@ -1676,12 +1678,60 @@ elif menu_pilihan == "Rekap Kebutuhan Mingguan":
                     'fg_color': '#D7E4BC', 
                     'border': 1
                 })
+                
+                # Format untuk baris SUB TOTAL
+                subtotal_format = workbook.add_format({
+                    'bold': True,
+                    'valign': 'vcenter',
+                    'align': 'center',
+                    'fg_color': '#FFE699',
+                    'border': 1
+                })
+                
+                # Tulis header
                 for col_num, value in enumerate(result_df_kebutuhan.columns.values):
                     worksheet.write(0, col_num, value, header_format)
+                
                 # Set row height untuk header agar cukup untuk 2 baris teks
                 worksheet.set_row(0, 30)
                 worksheet.set_column(0, 0, 40)
                 worksheet.set_column(1, len(result_df_kebutuhan.columns)-1, 15)
+                
+                # Tambahkan rumus SUM untuk kolom Total di setiap baris (kecuali baris SUB TOTAL)
+                total_col_idx = len(result_df_kebutuhan.columns) - 1  # Kolom Total adalah kolom terakhir
+                num_date_cols = total_col_idx - 1  # Jumlah kolom tanggal (tidak termasuk kolom pertama "Paket & Menu")
+                
+                # Cari baris SUB TOTAL (baris terakhir)
+                last_row_idx = len(result_df_kebutuhan)  # Index baris terakhir di Excel (1-based after header)
+                
+                # Tambahkan rumus SUM untuk kolom Total di setiap baris data (kecuali SUB TOTAL)
+                for row_idx in range(1, last_row_idx):  # Mulai dari row 1 (setelah header)
+                    # Cek apakah ini baris SUB TOTAL
+                    paket_value = result_df_kebutuhan.iloc[row_idx - 1]['Paket & Menu']
+                    if str(paket_value).strip().upper() != 'SUB TOTAL':
+                        # Buat rumus SUM untuk kolom tanggal (kolom B sampai kolom sebelum Total)
+                        start_col = 1  # Kolom B (index 1)
+                        end_col = total_col_idx - 1  # Kolom sebelum Total
+                        
+                        # Convert ke huruf kolom Excel
+                        from xlsxwriter.utility import xl_col_to_name
+                        start_col_letter = xl_col_to_name(start_col)
+                        end_col_letter = xl_col_to_name(end_col)
+                        
+                        formula = f'=SUM({start_col_letter}{row_idx + 1}:{end_col_letter}{row_idx + 1})'
+                        worksheet.write_formula(row_idx, total_col_idx, formula)
+                
+                # Tambahkan rumus SUM untuk baris SUB TOTAL di setiap kolom
+                subtotal_row_idx = last_row_idx  # Baris SUB TOTAL adalah baris terakhir
+                
+                # Untuk setiap kolom tanggal dan kolom Total
+                for col_idx in range(1, len(result_df_kebutuhan.columns)):  # Mulai dari kolom 1 (skip "Paket & Menu")
+                    from xlsxwriter.utility import xl_col_to_name
+                    col_letter = xl_col_to_name(col_idx)
+                    
+                    # Rumus SUM dari baris 2 sampai baris sebelum SUB TOTAL
+                    formula = f'=SUM({col_letter}2:{col_letter}{subtotal_row_idx})'
+                    worksheet.write_formula(subtotal_row_idx, col_idx, formula, subtotal_format)
             excel_data_kebutuhan = output_kebutuhan.getvalue()
             now = datetime.datetime.now()
             download_filename_kebutuhan = now.strftime("%d_%m_%Y-%H_%M") + "-Rekap_Kebutuhan_Mingguan.xlsx"
