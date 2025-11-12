@@ -792,6 +792,12 @@ def transform_rekap_pemotongan(uploaded_file):
     
     existing_columns = [col for col in final_columns_order if col in df_final.columns]
     df_final = df_final[existing_columns]
+    
+    # Urutkan berdasarkan Tanggal Kirim (dari yang terdahulu), lalu No. Invoice
+    df_final = df_final.sort_values(['Tanggal Kirim', 'No. Invoice'], ascending=[True, True])
+    df_final = df_final.reset_index(drop=True)
+    
+    # Tambahkan nomor urut setelah pengurutan
     df_final.insert(0, 'Nomor', range(1, len(df_final) + 1))
     
     return df_final
