@@ -741,6 +741,9 @@ def transform_rekap_pemotongan(uploaded_file):
     # Buat df yang include 'Paket & Menu' untuk agregasi custom
     df_with_paket = df.copy()
     
+    # Tambahkan kolom urutan original untuk menjaga urutan upload
+    df_with_paket['_original_order'] = range(len(df_with_paket))
+    
     # Custom aggregation untuk kolom yang perlu mengikuti baris dengan "Paket" di kolom Q
     def aggregate_by_paket(group_df, col_name):
         # Cari baris yang di kolom 'Paket & Menu' mengandung kata "Paket"
@@ -754,11 +757,15 @@ def transform_rekap_pemotongan(uploaded_file):
             return group_df.iloc[0][col_name]
     
     # Aggregate data berdasarkan No. Invoice dengan logika khusus
-    grouped = df_with_paket.groupby('No. Invoice')
+    # Gunakan sort=False agar urutan group mengikuti urutan kemunculan pertama
+    grouped = df_with_paket.groupby('No. Invoice', sort=False)
     
     result_rows = []
     for invoice, group in grouped:
         result_row = {'No. Invoice': invoice}
+        
+        # Simpan urutan original (ambil yang pertama dari group)
+        result_row['_original_order'] = group['_original_order'].iloc[0]
         
         for col in df_base.columns:
             if col == 'No. Invoice':
@@ -775,6 +782,9 @@ def transform_rekap_pemotongan(uploaded_file):
         result_rows.append(result_row)
     
     df_base_aggregated = pd.DataFrame(result_rows)
+    
+    # Urutkan kembali berdasarkan urutan original
+    df_base_aggregated = df_base_aggregated.sort_values('_original_order').drop('_original_order', axis=1)
 
     # Merge dengan paket (bisa multiple rows jika ada berbeda paket)
     df_merged = pd.merge(df_base_aggregated, df_paket_final, on='No. Invoice', how='left')
