@@ -523,7 +523,7 @@ def format_rekap_pemotongan_excel(writer, df):
             # === KOLOM C & D: Cek jika Tanggal Kirim = Tanggal Potong ===
             if col_name == 'Tanggal Kirim':
                 # Bandingkan dengan Tanggal Potong (kolom D)
-                tanggal_potong_val = row_data[3]
+                tanggal_potong_val = row_data.get('Tanggal Potong')
                 tanggal_kirim_val = cell_value
                 
                 # Handle datetime objects - extract date part only
@@ -545,7 +545,7 @@ def format_rekap_pemotongan_excel(writer, df):
             
             elif col_name == 'Tanggal Potong':
                 # Bandingkan dengan Tanggal Kirim (kolom C)
-                tanggal_kirim_val = row_data[2]
+                tanggal_kirim_val = row_data.get('Tanggal Kirim')
                 tanggal_potong_val = cell_value
                 
                 # Handle datetime objects - extract date part only
