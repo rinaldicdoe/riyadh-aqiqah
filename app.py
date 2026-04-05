@@ -986,6 +986,8 @@ def transform_and_create_word_label(file_input):
             df[col] = df[col].dt.strftime('%d/%m/%Y')
         
         def format_time(time_val):
+            if pd.isna(time_val):
+                return ''
             if isinstance(time_val, datetime.time):
                 return time_val.strftime('%H:%M')
             elif isinstance(time_val, str):
@@ -995,22 +997,41 @@ def transform_and_create_word_label(file_input):
         df['Jam Tiba (hh:mm)'] = df['Jam Tiba (hh:mm)'].apply(format_time)
         df['Jam Kirim (hh:mm)'] = df['Jam Kirim (hh:mm)'].apply(format_time)
 
-        df.fillna('', inplace=True)
+        # Hindari fillna string ke seluruh DataFrame karena bisa gagal pada kolom float64.
+        def safe_text_series(series):
+            return (
+                series.where(series.notna(), '')
+                .astype(str)
+                .replace({'nan': '', 'NaT': ''})
+                .str.strip()
+            )
+
+        nama_anak = safe_text_series(df['Nama Anak'])
+        no_invoice = safe_text_series(df['No. Invoice'])
+        jenis_kelamin = safe_text_series(df['Jenis Kelamin Anak'])
+        cabang = safe_text_series(df['Cabang'])
+        tanggal_kirim = safe_text_series(df['Tanggal Kirim'])
+        tanggal_potong = safe_text_series(df['Tanggal Potong'])
+        jam_tiba = safe_text_series(df['Jam Tiba (hh:mm)'])
+        jam_kirim = safe_text_series(df['Jam Kirim (hh:mm)'])
+        paket_menu = safe_text_series(df['Paket & Menu'])
+        jumlah = safe_text_series(df['Jumlah']).str.replace(r'\.0$', '', regex=True)
+        satuan = safe_text_series(df['Satuan'])
         
         df['Detail Customer'] = (
-            "Nama Aqiqah:\n" + df['Nama Anak'].astype(str).str.strip() + "\n" +
-            "No. Invoice: " + df['No. Invoice'].astype(str).str.strip() + "\n" +
-            "Jenis Kelamin: " + df['Jenis Kelamin Anak'].astype(str).str.strip() + "\n" +
-            "Cabang: " + df['Cabang'].astype(str).str.strip()
+            "Nama Aqiqah:\n" + nama_anak + "\n" +
+            "No. Invoice: " + no_invoice + "\n" +
+            "Jenis Kelamin: " + jenis_kelamin + "\n" +
+            "Cabang: " + cabang
         )
         df['Detail Waktu'] = (
-            "Tgl Kirim: " + df['Tanggal Kirim'].astype(str).str.strip() + "\n" +
-            "Tgl Potong: " + df['Tanggal Potong'].astype(str).str.strip() + "\n" +
-            "Jam Tiba: " + df['Jam Tiba (hh:mm)'].astype(str).str.strip() + "\n" +
-            "Jam Kirim: " + df['Jam Kirim (hh:mm)'].astype(str).str.strip()
+            "Tgl Kirim: " + tanggal_kirim + "\n" +
+            "Tgl Potong: " + tanggal_potong + "\n" +
+            "Jam Tiba: " + jam_tiba + "\n" +
+            "Jam Kirim: " + jam_kirim
         )
         # Format Menu: remove decimal points, keep only integers
-        df['Menu'] = df['Paket & Menu'].astype(str) + " " + df['Jumlah'].astype(str).str.replace(r'\.0$', '', regex=True) + " " + df['Satuan'].astype(str)
+        df['Menu'] = paket_menu + " " + jumlah + " " + satuan
         df['Berat'] = "Berat |\n....... KG"
 
         df_final = df[['Detail Customer', 'Detail Waktu', 'Menu', 'Berat', 'Cabang']].copy()
